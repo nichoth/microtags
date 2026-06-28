@@ -1,0 +1,71 @@
+body {
+    font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+}
+
+my-counter, count-button, copy-btn {
+    &:not(:defined) {
+        display: none;
+    }
+}
+
+main {
+    max-width: 40rem;
+    margin: 0 auto;
+}
+
+count-button, copy-btn {
+    & button {
+        border-radius: 0;
+        background-color: transparent;
+        outline: 1px solid transparent;
+        border: 1px solid;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        transform: translateY(0);
+
+        &:hover, &:focus, &:focus-visible {
+            outline-color: black;
+            transform: translateY(-1px);
+        }
+
+        &:active {
+            transform: translateY(1px);
+        }
+    }
+}
+
+copy-btn {
+    & button {
+        min-width: 6rem;
+    }
+
+    /* persistent outline while the "Copied!" feedback is showing */
+    &.copied button {
+        outline-color: black;
+    }
+}
+
+my-counter {
+    display: block;
+    aspect-ratio: 4/3;
+    margin: 2rem auto;
+    padding: 1.5rem;
+    border: 1px solid black;
+    text-align: center;
+
+    /* these styles are specific to the buttons in this context */
+    & button {
+        padding: 0.4rem 1rem;
+        margin-right: 1rem;
+    }
+
+    & .controls {
+        margin-top: 2rem;
+    }
+}
+
+my-counter [data-ref="display"] {
+    font-size: 1.5rem;
+    margin: 1rem 0;
+}

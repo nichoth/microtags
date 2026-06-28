@@ -1,0 +1,258 @@
+{
+  "project": "microtags",
+  "branchName": "ralph/microtags",
+  "description": "Port of nanotags - a tiny, typed Custom Elements wrapper with reactive props, automatic cleanup, no Shadow DOM, and hydration-first design - swapping the reactivity engine from nanostores to alien-signals. Reactive props are exposed as native callable signals (count() reads, count(v) writes). Ships three entrypoints: microtags, microtags/render, microtags/context.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Project setup and package identity",
+      "description": "As a developer, I need the repo configured as the microtags package with the right dependencies and export map so the ported modules resolve correctly.",
+      "acceptanceCriteria": [
+        "package.json name set to the microtags package name; template placeholders ({{package-name}}, {{repo-name}}, {{component-name}}) replaced or removed",
+        "alien-signals added as a dependency",
+        "@standard-schema/spec added as a dependency",
+        "exports map exposes '.', './render', and './context' subpaths in both ESM and CJS, matching the existing dual-format build",
+        "sideEffects: false is set in package.json",
+        "npm run build produces dist/index, dist/render, dist/context in both ESM and CJS with type declarations",
+        "Typecheck passes",
+        "Lint passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Port shared types and utils",
+      "description": "As a developer, I need the foundational types.ts and utils.ts ported so the rest of the modules have their primitives.",
+      "acceptanceCriteria": [
+        "src/types.ts ports nanotags' shared types, adjusted so reactive values are typed as alien-signals signals rather than nanostores atoms",
+        "src/types.ts declares the SetupContext (ctx) type shape so factory and define can typecheck against it before setup-context is implemented",
+        "src/utils.ts ports nanotags' shared helpers",
+        "No reference to nanostores remains in either file",
+        "Typecheck passes",
+        "Lint passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Reactivity adapter over alien-signals",
+      "description": "As a developer, I need a small internal reactivity layer (signal, effect, effectScope, peek, untracked) so every nanostores call site maps cleanly onto alien-signals.",
+      "acceptanceCriteria": [
+        "Internal helpers created for: creating a signal, reading a signal, writing a signal, running an auto-tracked effect, and disposing a group of effects via effectScope",
+        "A prop value handed to user code is the native alien-signals callable signal (count() to read, count(v) to write)",
+        "untracked(fn) reads inside fn without creating a subscription, implemented via setCurrentSub(undefined) with restore in a finally",
+        "peek(signal) returns the signal's current value without subscribing (peek(s) === untracked(() => s()))",
+        "peek and untracked are exported from the main entrypoint (src/index.ts)",
+        "Effects created during a component's setup() are grouped in an effectScope so they can be disposed together on disconnect",
+        "Typecheck passes",
+        "Lint passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Port the custom-element factory and lifecycle",
+      "description": "As a developer, I need factory.ts ported so define() produces a real custom element with the nanotags lifecycle and cleanup scope.",
+      "acceptanceCriteria": [
+        "Factory produces an HTMLElement subclass with no Shadow DOM",
+        "connectedCallback hydrates props from attributes and runs setup()",
+        "attributeChangedCallback updates the corresponding prop signal",
+        "disconnectedCallback runs all registered cleanups",
+        "Reconnecting re-runs setup() with a fresh cleanup scope while preserving programmatically-set prop values",
+        "If a cleanup throws, the remaining cleanups still run and the first error re-throws afterward",
+        "Typecheck passes",
+        "Lint passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Port the withProps builder (coercers and Standard Schema)",
+      "description": "As a developer, I need the withProps part of builders.ts ported so props are declared with typed, inferred coercers and validators.",
+      "acceptanceCriteria": [
+        "withProps((p) => ...) supports the built-in coercers (number, string, boolean, json)",
+        "withProps accepts any Standard Schema validator (e.g. Zod, Valibot, ArkType) for a prop",
+        "Attribute-backed, JSON, and property-only prop variants supported",
+        "Props are type-inferred through the chain into setup()",
+        "Typecheck passes",
+        "Lint passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Port the withRefs and withContexts builders",
+      "description": "As a developer, I need the withRefs and withContexts parts of builders.ts ported so components declare typed, inferred refs and context dependencies.",
+      "acceptanceCriteria": [
+        "withRefs((r) => ...) resolves single (r.one) and multiple (r.all) refs via [data-ref=\"name\"] selectors",
+        "withContexts((c) => ...) declares context dependencies",
+        "Refs and contexts are type-inferred through the chain into setup()",
+        "Typecheck passes",
+        "Lint passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Port the setup context (ctx)",
+      "description": "As a developer, I need setup-context.ts ported so the ctx object passed to setup() exposes the nanotags API backed by alien-signals.",
+      "acceptanceCriteria": [
+        "ctx.host is the element; ctx.props are callable signals; ctx.refs are resolved refs; ctx.contexts are resolved contexts",
+        "ctx.peek(signal) reads a signal's value without subscribing, even when called inside a ctx.effect",
+        "ctx.on(target, type, handler) adds a listener, auto-removed on disconnect",
+        "ctx.effect(...) runs an alien-signals effect that auto-tracks the signals it reads and is auto-disposed on disconnect",
+        "ctx.bind(target, property, signal) two-way binds a DOM property to a signal, auto-cleaned on disconnect",
+        "ctx.onCleanup(fn) registers custom teardown run on disconnect",
+        "ctx.consume(token) reads an optional context",
+        "Typecheck passes",
+        "Lint passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Port the define() fluent entry",
+      "description": "As a developer, I need define.ts ported so the chainable builder ties the pieces together and registers the element.",
+      "acceptanceCriteria": [
+        "define(tagName) returns a builder with .withProps, .withRefs, .withContexts, and .setup",
+        "Calling .setup(callback) registers the custom element",
+        "The chain compiles with full inference (props/refs/contexts visible and correctly typed inside setup())",
+        "Exported from src/index.ts",
+        "Typecheck passes",
+        "Lint passes"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Port cross-component context (microtags/context)",
+      "description": "As a developer, I need context.ts ported so components can provide and consume shared context, deferring setup until required contexts resolve.",
+      "acceptanceCriteria": [
+        "microtags/context entrypoint exports the context creation / provide / consume API matching nanotags",
+        "A component declaring required contexts via .withContexts() does not run setup() until those contexts resolve",
+        "Context values are backed by alien-signals so consumers react to changes",
+        "./context subpath resolves in both ESM and CJS with type declarations",
+        "Typecheck passes",
+        "Lint passes"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Port the render helpers (microtags/render)",
+      "description": "As a developer, I need render.ts ported so the templating helpers are available from the ./render subpath.",
+      "acceptanceCriteria": [
+        "microtags/render entrypoint exports the render/templating helpers with the same signatures as nanotags",
+        "Helpers are tree-shakeable (isolated subpath, sideEffects: false)",
+        "./render subpath resolves in both ESM and CJS with type declarations",
+        "Typecheck passes",
+        "Lint passes"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Test harness plus define and reactive-props tests",
+      "description": "As a developer, I need the test runner wired and the core define/props behavior verified in the browser runner.",
+      "acceptanceCriteria": [
+        "npm test runs the browser tests via esbuild then tapout",
+        "Tests cover define registering a working custom element",
+        "Tests cover reactive props: reading, writing, and reacting (an effect re-runs when a prop signal changes)",
+        "No assertions on specific rendered text or HTML strings",
+        "Tests pass via npm test",
+        "Typecheck passes",
+        "Lint passes"
+      ],
+      "priority": 11,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Attribute hydration and refs tests",
+      "description": "As a developer, I need attribute hydration and ref resolution verified.",
+      "acceptanceCriteria": [
+        "Tests cover hydrating props from attributes on connect",
+        "Tests cover attributeChangedCallback updating the matching prop signal",
+        "Tests cover refs: r.one resolves a single [data-ref], r.all resolves multiple",
+        "No assertions on specific rendered text or HTML strings",
+        "Tests pass via npm test",
+        "Typecheck passes",
+        "Lint passes"
+      ],
+      "priority": 12,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Context provide/consume and deferred-setup tests",
+      "description": "As a developer, I need cross-component context behavior verified, including deferred setup.",
+      "acceptanceCriteria": [
+        "Tests cover providing and consuming a context across components",
+        "Tests cover deferred setup: setup() does not run until required contexts resolve",
+        "Tests cover consumers reacting to context value changes",
+        "No assertions on specific rendered text or HTML strings",
+        "Tests pass via npm test",
+        "Typecheck passes",
+        "Lint passes"
+      ],
+      "priority": 13,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Untracked-read and cleanup tests",
+      "description": "As a developer, I need untracked reads and the automatic-cleanup guarantee verified.",
+      "acceptanceCriteria": [
+        "Test: a peek/untracked read inside an effect does NOT re-run the effect when that signal later changes",
+        "Tests cover cleanup of listeners (ctx.on), effects (ctx.effect), bindings (ctx.bind), and onCleanup callbacks on disconnect",
+        "Test: throwing-cleanup behavior - remaining cleanups still run and the first error re-throws afterward",
+        "No assertions on specific rendered text or HTML strings",
+        "Tests pass via npm test",
+        "Typecheck passes",
+        "Lint passes"
+      ],
+      "priority": 14,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Update README, example, and docs",
+      "description": "As a user, I want documentation that reflects the microtags API and the alien-signals reactivity model.",
+      "acceptanceCriteria": [
+        "README documents define, props, refs, contexts, the ctx API (including peek / untracked for non-subscribing reads), and both sub-entrypoints, using the callable-signal read/write form",
+        "README notes the one divergence from nanotags: native alien-signals (callable) replace nanostores atoms; $-prefixed atom names become plain callable signal names",
+        "The example/ app uses the ported API and runs",
+        "Typecheck passes",
+        "Lint passes",
+        "Verify the example in the browser using the dev-browser skill"
+      ],
+      "priority": 15,
+      "passes": true,
+      "notes": ""
+    }
+  ]
+}

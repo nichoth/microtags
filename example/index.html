@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="index.css">
+    <title>microtags example</title>
+</head>
+
+<body>
+    <main>
+        <h1>microtags example</h1>
+        <my-counter start="5">
+            <div data-ref="display" role="status" class="count"></div>
+
+            <div class="controls">
+                <count-button
+                    class="dec"
+                    data-ref="dec"
+                    aria-label="Decrement"
+                >
+                    <button>-</button>
+                </count-button>
+
+                <copy-btn class="copy" data-ref="copy">
+                    <button>Copy</button>
+                </copy-btn>
+
+                <count-button
+                    class="inc"
+                    data-ref="inc"
+                    aria-label="Increment"
+                >
+                    <button>+</button>
+                </count-button>
+            </div>
+
+        </my-counter>
+    </main>
+    <script type="module" src="./index.ts"></script>
+</body>
+
+</html>

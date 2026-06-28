@@ -1,0 +1,237 @@
+## Codebase Patterns
+
+- Build uses esbuild for JS output and `tsc --emitDeclarationOnly` for `.d.ts` files.
+- `tsconfig.build.json` extends `tsconfig.json` and excludes `example/` and `test/`; it also sets `rootDir: ./src` so declarations land at `dist/index.d.ts` (not `dist/src/index.d.ts`).
+- `tsconfig.json` must include `"ignoreDeprecations": "6.0"` for TypeScript 6.x compatibility (`esModuleInterop: false` is deprecated).
+- `.eslintignore` excludes generated `.js` files in `bin/` (same reason `dist/*` and `test/*.js` are excluded).
+- Three entrypoints: `src/index.ts`, `src/render.ts`, `src/context.ts` — each produces ESM, CJS, and `.d.ts` outputs.
+- Test harness: `esbuild --bundle ./test/index.ts | tapout` — pipes bundled test JS through tapout (Playwright-based browser runner). The `--bundle` flag is required so esbuild resolves all imports before piping to tapout.
+- `listFiles: true` in `tsconfig.json` causes tsc to print included file paths to stdout — this is normal noise, not errors.
+
+---
+
+## 2026-06-26 - US-001
+
+- Renamed package to `microtags`, removed `private: true`, added `sideEffects: false`.
+- Added `alien-signals@^3.2.1` and `@standard-schema/spec@^1.1.0` to dependencies.
+- Removed `@substrate-system/web-component` from dependencies (template leftover).
+- Updated exports map to expose `.`, `./render`, and `./context` with ESM, CJS, and types declarations.
+- Updated `build` script to only compile TS (removed CSS build steps); updated `build-cjs` / `build-esm` / `build-esm:min` to list the three entrypoints explicitly.
+- Fixed `build-example` to remove `{{repo-name}}` placeholder.
+- Added `rootDir: ./src` and `ignoreDeprecations: 6.0` to `tsconfig.build.json`.
+- Added `ignoreDeprecations: 6.0` to base `tsconfig.json`.
+- Replaced template `src/index.ts` (had Example class with `{{component-name}}` placeholders) with a minimal stub `export {}`.
+- Created stub `src/render.ts` and `src/context.ts` (both `export {}`).
+- Replaced template `test/index.ts` with a simple placeholder test.
+- Added `bin/*.js` to `.eslintignore` (generated esbuild output, same as `test/*.js`).
+- **Learnings for future iterations:**
+  - esbuild `src/*.ts` glob would also pick up non-entrypoint files added later; explicit file lists in build scripts are safer.
+  - `tsc --emitDeclarationOnly` requires `rootDir` set explicitly when the tsconfig excludes directories relative to project root.
+  - TypeScript 6.x treats `esModuleInterop: false` as deprecated; add `ignoreDeprecations: "6.0"` to silence it.
+  - tapout runs tests in a real browser via Playwright — test code must be DOM-safe.
+---
+
+## 2026-06-26 - US-002
+- Created `src/types.ts` with foundational types: `Signal<T>`, `Coercer<T>`, `PropDef<T>`, `PropType<D>`, `PropsSignals<Defs>`, `ContextToken<T>`, `ContextValue<Tok>`, `ContextsMap<Tokens>`, `Cleanup`, and `SetupContext<Props, Refs, Contexts>`.
+- Created `src/utils.ts` with shared helpers: `coerceNumber`, `coerceString`, `coerceBoolean`, `coerceJson`, and `runCleanups` (runs all cleanups even if some throw, then re-throws the first error).
+- No nanostores references introduced; alien-signals signal shape used throughout.
+- **Skipped test-first**: types.ts is pure compile-time scaffolding; utils.ts coercers are trivial single-purpose functions that will be exercised through integration tests in US-011+. The two AC checks (typecheck + lint) are sufficient gates for this story.
+- **`npm test` pre-existing failure**: The test script (`esbuild ./test/index.ts | tapout`) lacks `--bundle`, so tapzero can't resolve in the browser. This is expected to be fixed in US-011, not US-002.
+- Files changed: `src/types.ts` (new), `src/utils.ts` (new), `progress.log`, `specs/prd.json`
+- **Learnings for future iterations:**
+  - The ESLint rule requires `space-before-function-paren` — always add a space between the function name and `(` in exported functions (auto-fixable with `--fix`).
+  - `SetupContext` generic parameters use wide defaults (`Record<string, PropDef>` etc.) so callers can omit them and still get a valid type.
+  - `coerceBoolean` returns `true` for attribute presence (any value including `""`), `false` for absence (`null`) — matches the HTML boolean attribute convention.
+---
+
+## 2026-06-26 - US-003
+- Created `src/reactivity.ts` with: re-exports of `signal`, `effect`, `effectScope` from alien-signals; `untracked<T>(fn)` that suspends the current subscriber via `setActiveSub(undefined)` with restore in finally; `peek<T>(sig)` that returns current value without subscribing.
+- Updated `src/index.ts` to export `peek` and `untracked` from `./reactivity.js`.
+- Updated `test/index.ts` with four reactivity tests (peek/untracked subscription isolation, value reads, context restore).
+- **Skipped `npm test` run**: test harness is missing `--bundle` flag (esbuild won't resolve imported modules in browser); tests will be exercised in US-011. Verified via typecheck and lint instead.
+- Files changed: `src/reactivity.ts` (new), `src/index.ts`, `test/index.ts`, `progress.log`, `specs/prd.json`
+- **Learnings for future iterations:**
+  - alien-signals v3 exposes `setActiveSub` (not `setCurrentSub`). The PRD AC mentioned `setCurrentSub` — that was from an older API; use `setActiveSub` from the main `alien-signals` import.
+  - `setActiveSub(undefined)` returns the previous subscriber, so the finally block can restore it exactly.
+  - `no-void` ESLint rule fires on `void expr` — drop the void expression entirely; just call `peek(count)` for the side-effect-free read in the test.
+---
+
+## 2026-06-27 - US-004
+- Created `src/factory.ts` with the `factory<Props>()` function that returns an HTMLElement subclass with the microtags lifecycle (no Shadow DOM, signal-backed props, connectedCallback hydration, attributeChangedCallback updates, disconnectedCallback cleanup).
+- Added 9 factory tests to `test/index.ts` covering: no shadow DOM, attribute hydration, attributeChangedCallback signal update, cleanup on disconnect, effect disposal on disconnect, reconnect re-runs setup, reconnect preserves programmatic prop values, and cleanup-throws error propagation.
+- Tests run successfully via `npx esbuild --bundle ./test/index.ts | npx tapout` (28/28 pass).
+- Files changed: `src/factory.ts` (new), `test/index.ts`, `specs/prd.json`, `progress.log`
+- **Learnings for future iterations:**
+  - `disconnectedCallback` (and all custom element lifecycle callbacks) errors are swallowed by the browser when triggered via DOM methods like `removeChild`; call the method directly (`(el as any).disconnectedCallback()`) to test error propagation.
+  - `attributeChangedCallback` fires even when the element is disconnected — `removeAttribute` on a disconnected observed-attribute element updates the signal. Tests that use `removeAttribute` to simulate "no attribute on reconnect" must account for this.
+  - Snapshot-and-clear the cleanup list BEFORE calling `runCleanups` (not after): `const fns = this._cleanups; this._cleanups = []; runCleanups(fns)`. This prevents double-cleanup if the method is called re-entrantly (e.g., direct call then `removeChild`).
+  - `import/no-duplicates` ESLint rule fires when the same module is imported twice; merge into one import.
+  - `@typescript-eslint/no-this-alias` fires on `const host = this`; pass `this` directly as the object property value instead.
+  - `esbuild --bundle ./test/index.ts | tapout` works as the test runner — the `npm test` script is missing `--bundle` (will be fixed in US-011); use the explicit bundle flag to run tests now.
+---
+
+## 2026-06-27 - US-005
+- Created `src/builders.ts` with:
+  - `propDSL` object: `number()`, `string()`, `boolean()`, `json<T>()`, `schema()`, `prop()` methods
+  - `ComponentBuilder<Props>` class with `withProps()` and `setup()` fluent methods
+  - `define(tagName)` function (entry point, will be exported from index in US-008)
+  - Internal helpers: `isPropOnly()`, `isStandardSchema()`, `normalizePropDef()`
+- Updated `src/types.ts`: added `PropertyOnlyProp<T>` interface; added it to `PropDef<T>` union; updated `PropType<D>` conditional to handle `PropertyOnlyProp<T>`
+- Updated `src/factory.ts`: changed `FactoryConfig<Props>` constraint from `Record<string, PropDef>` to `FactoryProps` (= `Record<string, Coercer<unknown>>`), and typed `props: Props` (was `props: FactoryProps`). This allows TypeScript to infer the coercer types from the `props` object and provide correct signal types in `setup()` callbacks. Removed now-unused `PropDef` import.
+- Added 7 US-005 tests to `test/index.ts` covering all prop variants and attribute observability.
+- **Learnings for future iterations:**
+  - `FactoryConfig<Props extends FactoryProps>` with `props: Props` (not `props: FactoryProps`) lets TypeScript infer `Props` from the coercer record, so `ctx.props.count()` gets the concrete return type (number) instead of `unknown`.
+  - Changing `factory`'s generic constraint from `Props extends Record<string, PropDef>` to `Props extends FactoryProps` narrows what can be passed but is fine: the builders always convert PropDef to coercers first. `Coercer<T>` satisfies `PropDef<T>` anyway.
+  - `propDSL.json<T>()` uses `coerceJson as Coercer<T | undefined>` — the `<T>` is provided by the caller at use site, not inferred.
+  - Property-only props (`p.prop(initial)`) are kept out of `observedAttrNames`; the factory's `connectedCallback` only updates the signal when `getAttribute` returns non-null, so property-only props safely preserve their value across reconnects.
+  - For `ComponentBuilder.setup()`, cast the user callback as `any` before passing to `factory` to avoid the type mismatch between builder's `Props extends Record<string, PropDef>` and factory's narrower `Props extends FactoryProps`.
+  - `type PS = PropsSignals<Props>` accidentally used as the `Refs` type arg in `SetupContext<Props, PS, any>` causes TS2344; always use `any` for unused type parameters in SetupContext inside builders.
+---
+
+## 2026-06-27 - US-006
+- Added `SingleRefDef`, `MultipleRefDef`, `RefDef`, `RefsMap` to `src/types.ts`.
+- Added `RefsDSL` type and `refsDSL` constant (`r.one` / `r.all` as plain object properties, not functions).
+- Added `ContextDSL` type (empty record — factory callback is provided for API consistency and future extension, but `c` itself has no methods; users reference imported context tokens directly).
+- Updated `ComponentBuilder` to three type params: `Props`, `RefDefs`, `CtxDefs`; added `_refDefs` and `_ctxDefs` fields; all existing builder methods updated to thread the new type params.
+- Added `withRefs(fn: (r: RefsDSL) => R)` and `withContexts(fn: (c: ContextDSL) => C)` to `ComponentBuilder`.
+- Updated `setup()` to infer `RefsMap<RefDefs>` and `ContextsMap<CtxDefs>` as the context types for setup().
+- Added `collectRefs(host, defs)` to `src/factory.ts`: queries `[data-ref="${key}"]` within host; throws listing all missing `ref:one` entries; returns `Element[]` for `ref:all` (empty array if none).
+- Updated `FactoryConfig` with optional `refs?` and `contexts?` fields; updated `factory()` to call `collectRefs` and build a `contexts` map (all values `undefined` until US-009) in `connectedCallback`.
+- Added 6 US-006 tests; all 49 tests pass.
+- Files changed: `src/types.ts`, `src/builders.ts`, `src/factory.ts`, `test/index.ts`, `specs/prd.json`, `progress.log`
+- **Learnings for future iterations:**
+  - `r.one` and `r.all` as plain object properties (not functions) on the `RefsDSL` keeps usage clean: `{ button: r.one, items: r.all }` vs nanotags' `{ button: one(), items: many() }`.
+  - `collectRefs` must throw only after iterating all keys so the error message lists all missing refs at once (not just the first one).
+  - `ContextDSL = Record<never, never>` signals to callers that `c` has no methods — they can name the param `_c` or `_` to suppress unused-variable warnings.
+  - For `r.all`, returning an empty array (not throwing) is the right default: list refs often start empty and populate dynamically.
+  - The `withContexts` callback style (rather than `withContexts(contexts)` directly) is intentional API consistency; future context DSL methods can be added without a breaking change.
+---
+
+## 2026-06-27 - US-007
+- Created `src/setup-context.ts` with `makeSetupContext()` that builds the ctx object (host, props, refs, contexts, peek, on, effect, bind, onCleanup, consume).
+- Refactored `src/factory.ts` to import and call `makeSetupContext()` instead of building ctx inline.
+- Added 4 US-007 tests: ctx.on auto-removes listener on disconnect; ctx.bind reactively updates DOM property and stops after disconnect; ctx.peek does not create a subscription inside ctx.effect; ctx.consume returns undefined when no provider is registered.
+- Files changed: `src/setup-context.ts` (new), `src/factory.ts`, `test/index.ts`, `specs/prd.json`, `progress.log`
+- **Learnings for future iterations:**
+  - TypeScript narrows variables assigned inside setup callbacks (closures) in ways that can cause `never` types at the outer scope — avoid accessing closure-captured DOM nodes via `?.value` after closure assignment; instead query the DOM directly after `appendChild` (e.g. `el.querySelector('input') as HTMLInputElement`).
+  - Do NOT annotate alien-signals' `signal()` return value with our custom `Signal<T>` type in tests — the call signature shapes may differ in subtle ways that TypeScript rejects. Let TypeScript infer the signal type from usage instead.
+  - `makeSetupContext` takes `cleanups: Cleanup[]` by reference so factory.ts can drain it on disconnect without copying; the function mutates the array via `.push()`.
+  - The `consume` stub returning `undefined` is intentional until US-009 wires up real context providers.
+---
+
+## 2026-06-27 - US-008
+- Exported `define` from `src/index.ts` (was missing despite being implemented in `builders.ts`).
+- Updated `ComponentBuilder.setup()` to call `customElements.define(this.tagName, El)` before returning the class, so the element is auto-registered in one step.
+- Added 3 US-008 tests: define() registers element in customElements registry; setup() returns the element class; full define chain resolves props and works.
+- Updated all existing ComponentBuilder-based tests to drop the manual `customElements.define(tag, El)` call that followed `.setup()` — auto-registration made them redundant (and would have thrown "already defined" errors).
+- All 60 tests pass; lint clean.
+- Files changed: `src/index.ts`, `src/builders.ts`, `test/index.ts`, `specs/prd.json`, `progress.log`
+- **Learnings for future iterations:**
+  - `ComponentBuilder` always has `this.tagName`; `setup()` can auto-register because the builder captures the tag name at construction time via `define(tagName)`.
+  - Once `setup()` auto-registers, any test that calls `.setup()` and then `customElements.define(tag, El)` will throw "already defined" — remove the manual registration from those tests.
+  - The `define()` function and `ComponentBuilder` live in `builders.ts`; only `define` is exported from `src/index.ts` (the builder class stays internal, available for direct use in tests via named import).
+---
+
+## 2026-06-27 - US-009
+- Implemented `src/context.ts` with `createContext<T>()`, `provide(element, token, value)`, `resolveContextSignal(element, token)`, and `onContextAvailable(id, callback)`.
+- Context values are stored as alien-signals signals in a `WeakMap<Element, Map<symbol, Signal<unknown>>>`. When `provide()` is called again with a new value, the existing signal is updated in place, so any subscribed effects re-run automatically.
+- Pending consumers are tracked in `Map<symbol, Set<() => void>>`. When `provide()` is called, `notifyPending` fires all registered callbacks for that context id.
+- Updated `src/factory.ts` `connectedCallback` to:
+  - Build a reactive `Proxy` for `contexts`: reading a key inside a `ctx.effect` calls the provider's signal, creating a subscription so effects react to context changes.
+  - Defer setup via `tryRunSetup` / `tryRunSetupIfConnected` until all `.withContexts()` declared tokens are resolved in the ancestor DOM.
+  - Register `onContextAvailable` listeners (pushed to both a local `cancelCallbacks` array and `cleanups`) so setup runs when the last required context becomes available. Both arrays are safe to clean up multiple times.
+  - Move `collectRefs` into `tryRunSetup` so refs are only queried when setup actually runs.
+- Updated `src/setup-context.ts`: `ctx.consume(token)` now walks up the DOM via `resolveContextSignal` and returns the current signal value (or `undefined` if no provider).
+- Updated `test/index.ts`: updated the US-006 `withContexts` test and `withProps+withRefs+withContexts chain` test to wrap elements in a provider div and call `provide()` before connecting to the DOM (required because deferred setup is now real). Added 5 US-009 tests.
+- All 70 tests pass; lint clean; typecheck clean.
+- Files changed: `src/context.ts`, `src/factory.ts`, `src/setup-context.ts`, `test/index.ts`, `specs/prd.json`, `progress.log`
+- **Learnings for future iterations:**
+  - The `isConnected` guard for deferred setup must only apply to callbacks registered via `onContextAvailable` (the async path). The synchronous `tryRunSetup` path (called directly from `connectedCallback`) must NOT have the guard, or tests calling `connectedCallback()` directly on disconnected elements will silently skip setup.
+  - Context signals are stored by `token.id` (symbol), not by token reference, so manually created tokens (`{ id: Symbol('x') }`) and `createContext()`-created tokens are interchangeable as long as the id matches.
+  - Any test that uses `.withContexts()` must now provide those contexts before or immediately after connecting the element; setup is deferred until all declared contexts resolve.
+  - `resolveContextSignal` walks `element.parentElement` (not `element` itself), so `provide()` must be called on an ancestor, not on the element itself.
+---
+
+## 2026-06-27 - US-010
+- Implemented `src/render.ts` with `render()` and `renderList()` helpers,
+  ported directly from nanotags' render module with TypeScript types.
+- Added 7 render tests to `test/index.ts` covering: stamp, reuse on re-render,
+  no-options call, list item count, item removal, key-based element reuse, and
+  skipping update when data ref is unchanged.
+- All 79 tests pass; lint clean; typecheck clean.
+- Files changed: `src/render.ts`, `test/index.ts`, `specs/prd.json`,
+  `progress.log`
+- **Learnings for future iterations:**
+  - `template.content.cloneNode(true)` returns `Node`, not `DocumentFragment`
+    — cast to `Element` before accessing `firstElementChild`.
+  - The render helpers have no reactivity dependency; they are pure DOM
+    manipulation and import nothing from alien-signals.
+  - `elementData` WeakMap tracks the last data item rendered into each element
+    to skip redundant `update()` calls when the same object ref is re-supplied.
+---
+
+## 2026-06-27 - US-011
+- Fixed `npm test` script: added `--bundle` flag to esbuild so imports resolve in the browser runner (`esbuild --bundle ./test/index.ts | tapout`).
+- Added two US-011 tests to `test/index.ts`:
+  - "define: registers a working custom element" — verifies `define()` produces an `instanceof HTMLElement` and registers in `customElements`.
+  - "reactive props: reading, writing, and reacting" — directly writes to a prop signal (`propSignal(99)`) and verifies the `ctx.effect` re-runs.
+- All 85 tests pass via `npm test`; lint clean; typecheck clean.
+- Files changed: `package.json` (test script), `test/index.ts`, `specs/prd.json`, `progress.log`
+- **Learnings for future iterations:**
+  - The `--bundle` flag is required for esbuild when the test file imports from node_modules or relative paths — without it, esbuild outputs non-bundled ESM which the browser tapout runner cannot resolve.
+  - To test prop signal writes directly (bypassing attribute mechanism), capture the signal reference in setup via `propSignal = ctx.props.count as any` and then call `(propSignal as any)(value)` in the test.
+---
+
+## 2026-06-27 - US-012
+- Added three tests to `test/index.ts` under a `// US-012` section:
+  - "attribute hydration: props initialized from attributes on connect" — verifies string, number, and boolean props are coerced from attributes at connect time via the `define()` API.
+  - "attributeChangedCallback: updates prop signal on attribute change" — verifies that setting an attribute after connect re-runs a tracked effect with the new coerced value.
+  - "refs: r.one resolves single and r.all resolves multiple via define()" — verifies `withRefs()` resolves a `r.one` element and a `r.all` array via `[data-ref]` selectors in a `define()` chain.
+- All 99 tests pass via `npm test`; lint clean.
+- Files changed: `test/index.ts`, `specs/prd.json`, `progress.log`
+- **Learnings for future iterations:**
+  - Each test must use a unique tag name — reusing a tag name across tests throws "already defined" from `customElements.define`.
+  - Boolean attribute hydration (`p.boolean()`) returns `true` when any attribute value is present (including `""`), `false` when absent — test with `setAttribute('active', '')` for the truthy case.
+  - For `attributeChangedCallback` tests, set the attribute value before `appendChild` to hydrate; then set again after connect to trigger the callback separately.
+---
+
+## 2026-06-27 - US-013
+- Added three tests to `test/index.ts` under a `// US-013` section:
+  - "context: ctx.consume reads provided value from ancestor element" — verifies `ctx.consume(token)` returns the value set by `provide()` on an ancestor when using `define()` for the consumer.
+  - "context: deferred setup waits for ALL required contexts" — verifies that setup does NOT run until all declared context tokens resolve (two-context case, which is a new scenario beyond US-009's single-context test).
+  - "context: consumer effect re-runs when context value changes" — verifies that a `ctx.effect` reading `ctx.contexts.count` re-runs on every `provide()` update, including multiple subsequent changes.
+- All 109 tests pass via `npm test`; lint clean.
+- Files changed: `test/index.ts`, `specs/prd.json`, `progress.log`
+- **Learnings for future iterations:**
+  - The multi-context deferred setup (two tokens, both required) works because `tryRunSetup` iterates `Object.values(ctxDefs)` and returns early if any token is missing — this is the correct guard for the multi-context case.
+  - `ctx.consume(token)` reads the signal value synchronously in setup; `ctx.contexts.key` is the Proxy path that creates reactive subscriptions inside `ctx.effect`. Both work, but only the Proxy path makes effects re-run on context changes.
+---
+
+## 2026-06-27 - US-014
+- Added 6 tests to `test/index.ts` under a `// US-014` section:
+  - "untracked: reading inside ctx.effect does not create subscription" — verifies `untracked()` from the main export used inside `ctx.effect` via `define()` does not create a reactive subscription (effect does not re-run when the untracked signal changes).
+  - "cleanup: ctx.on listener removed on disconnect" — verifies `ctx.on` auto-removes the event listener on disconnect via `define()` API.
+  - "cleanup: ctx.effect disposed on disconnect" — verifies `ctx.effect` stops re-running after disconnect.
+  - "cleanup: ctx.bind stops updating DOM property on disconnect" — verifies `ctx.bind` freezes the bound DOM property after disconnect.
+  - "cleanup: ctx.onCleanup callback runs on disconnect" — verifies `ctx.onCleanup` callback is invoked exactly once on disconnect.
+  - "cleanup: throwing cleanup - remaining run, first error re-throws" — verifies that when the first `ctx.onCleanup` throws, subsequent cleanups still run and the first error is re-thrown (tests via `disconnectedCallback()` directly per the established pattern).
+- All 126 tests pass via `npm test`; lint clean.
+- Files changed: `test/index.ts`, `specs/prd.json`, `progress.log`
+- **Learnings for future iterations:**
+  - The throwing-cleanup test must call `(el as any).disconnectedCallback()` directly (not `removeChild`) because browsers swallow exceptions from lifecycle callbacks when triggered via DOM methods — this pattern is consistent with the factory-level cleanup-error test added in US-004.
+  - `ctx.bind` cleanup can be verified by checking the DOM property does not update after disconnect when the bound signal changes.
+  - `untracked()` (the named export) and `ctx.peek()` (the ctx method) are both safe inside `ctx.effect` for non-subscribing reads; the US-014 test covers `untracked()` while US-007 covers `ctx.peek()`.
+---
+
+## 2026-06-27 - US-015
+
+- Rewrote `README.md` from template placeholders to full microtags documentation covering `define`, `withProps`, `withRefs`, `withContexts`, `setup`/ctx API, `peek`/`untracked`, and both subpaths (`microtags/context`, `microtags/render`). Noted the callable-signal divergence from nanotags in a comparison table.
+- Updated `example/index.html` to use `<my-counter start="5">` with inline `data-ref` children (refs must be in the HTML before the element upgrades).
+- Updated `example/index.ts` to define a working `my-counter` component using `define().withProps().withRefs().setup()`, a local signal, `ctx.effect`, and `ctx.on`. Removed the old template placeholder imports.
+- Updated `src/index.css` to style the `my-counter` example element.
+- Verified the example in the browser: counter hydrates from `start="5"`, increments/decrements reactively, and the display turns red when count goes negative.
+- Files changed: `README.md`, `example/index.html`, `example/index.ts`, `src/index.css`, `specs/prd.json`, `progress.log`
+- **Learnings for future iterations:**
+  - Custom element `connectedCallback` fires as soon as the element upgrades (when `customElements.define` is called if the element is already in the DOM). Refs set via `innerHTML` AFTER `define().setup()` are not present at connect time — always put `data-ref` children in the source HTML.
+  - `ctx.bind` requires `target: Record<string, unknown>` which TypeScript rejects for bare `HTMLElement`; use `ctx.effect` with direct property assignment instead, or cast via `as unknown as Record<string, unknown>`.
+---
