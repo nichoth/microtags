@@ -47,7 +47,13 @@ Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
     + [`renderList`](#renderlist)
     + [`render`](#render)
     + [Templates](#templates-1)
-- [Divergence from nanotags](#divergence-from-nanotags)
+- [Divergence from `nanotags`](#divergence-from-nanotags)
+  * [Reactivity primitive](#reactivity-primitive)
+  * [Effects track their reads](#effects-track-their-reads)
+  * [Refs: `r.all` instead of `r.many`](#refs-rall-instead-of-rmany)
+  * [Context API](#context-api)
+  * [Props](#props-1)
+  * [Not ported](#not-ported)
 
 <!-- tocstop -->
 
@@ -321,7 +327,6 @@ Declare reactive attributes via `withProps`. Each prop becomes:
 | `p.boolean()` | `"true"` / `""` &rarr; `true`, `"false"` &rarr; `false` | `false` |
 | `p.oneOf(opts)` | Picklist enum, throws on invalid | throws |
 
-
 #### `withProps`
 
 ```ts
@@ -335,6 +340,41 @@ Declare reactive attributes via `withProps`. Each prop becomes:
 }))
 ```
 
+##### `p.json`
+
+`p.json<T>()` -- a prop whose attribute value is parsed with
+`JSON.parse`. The type parameter `T` annotates the parsed result; it is a
+type only, so the value is not validated at runtime. The resulting signal is
+typed `T | undefined`.
+
+```ts
+.withProps(p => ({
+    user: p.json<{ id:number; name:string }>(),
+}))
+```
+
+```html
+<my-el user='{"id":1,"name":"Alice"}'></my-el>
+```
+
+Like the string/number/boolean validators it is attribute-backed and
+observed, so editing the attribute re-parses and pushes the new value to
+`ctx.props.user`. It falls back to `undefined` in two cases: when the
+attribute is absent, and when the value is not valid JSON. Parse errors are
+swallowed rather than thrown.
+
+```ts
+// check for `undefined` case
+ctx.effect(() => {
+    const user = ctx.props.user()
+    if (!user) return
+    ctx.refs.name.textContent = user.name
+})
+```
+
+For input you want validated rather than only parsed, pass a Standard Schema
+to [`p.schema`](#withprops) instead.
+
 Inside `setup()`, every prop is a callable signal:
 
 ```ts
@@ -342,6 +382,7 @@ ctx.props.count()      // read
 ctx.props.count(42)    // write
 ```
 
+---
 
 ### Refs
 
@@ -786,7 +827,11 @@ typed text survive: keyed nodes are reused and at most moved, never rebuilt.
 
 ---
 
-## Divergence from nanotags
+## Divergence from `nanotags`
+
+### Reactivity primitive
+
+`nanotags` uses `nanostores` atoms; `microtags` uses `alien-signals`.
 
 | nanotags (nanostores) | microtags (alien-signals) |
 |---|---|
@@ -795,5 +840,74 @@ typed text survive: keyed nodes are reused and at most moved, never rebuilt.
 | `$count.set(1)` | `count(1)` |
 | `ctx.props.$count` (store) | `ctx.props.count` (callable signal) |
 
-Props declared with `withProps` are native alien-signals callable signals.
-There is no `$` prefix convention; all prop names are plain identifiers.
+Props declared with `withProps` are signals. There is no `$` prefix convention;
+all prop names are plain identifiers.
+
+### Effects track their reads
+
+The largest difference. nanotags' `ctx.effect` takes the store(s) to watch
+explicitly and hands the value to the callback:
+
+```ts
+// nanotags
+ctx.effect(ctx.props.$count, count => {
+    ctx.refs.display.textContent = String(count)
+})
+```
+
+microtags' `ctx.effect` takes a zero-argument function and tracks whichever
+signals are read inside it, the `alien-signals` model:
+
+```ts
+// microtags
+ctx.effect(() => {
+    ctx.refs.display.textContent = String(ctx.props.count())
+})
+```
+
+The read operation in `ctx.effect` subscribes to the signal, and runs on
+any signal change. A read inside an effect that you do *not* want to track has
+to go through [`peek` or `untracked`](#peek-and-untracked).
+In nanotags `.get()` never subscribes, so there is no equivalent.
+
+### Refs: `r.all` instead of `r.many`
+
+The multi-element ref is `r.all()` in `microtags` and `r.many()` in `nanotags`.
+The empty-match behavior also differs: `r.all()` returns an empty array when
+nothing matches, whereas nanotags' `r.many()` throws. `r.one()` throws on a
+missing element in both.
+
+
+### Context API
+
+The context surface is shaped differently. See
+[`microtags/context`](#microtagscontext).
+
+| nanotags | microtags |
+|---|---|
+| `createContext<T>('name')` | `createContext<T>()`, no name |
+| `token.provide(ctx, value)` | `provide(ctx.host, token, value)`, standalone, returns a cleanup |
+| `withContexts({ theme: token })` | `withContexts(() => ({ theme: token }))`, a function |
+| `token.consume(ctx, cb)` | `ctx.consume(token)`, returns value-or-`undefined` |
+
+### Props
+
+| nanotags | microtags |
+|---|---|
+| `p.json(schema, default)`, hydrated from a `<script type="application/json">` tag, not an attribute | `p.json<T>()`, type-only, parsed from the observed attribute |
+| custom schema passed directly as the prop def | wrap it in `p.schema(validator)` |
+| property-only via `{ schema, attribute: false }` | `p.prop(initial)` |
+| nullable fallback `p.string(null)` | no null-fallback argument; a failed `p.schema` falls back to `undefined` |
+
+### Not ported
+
+These nanotags APIs have no microtags equivalent:
+
+- `ctx.emit` -- dispatch from the host directly with
+  `ctx.host.dispatchEvent(...)`.
+- `ctx.getElement` / `ctx.getElements` -- declare refs with `withRefs`, or
+  call `ctx.host.querySelector` directly.
+- The `setup` mixin return value -- `setup` returns `void`; it does not
+  assign members back onto the element.
+- The `define(name, setupFn)` two-argument shorthand -- always use the
+  builder chain ending in `.setup()`.
