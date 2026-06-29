@@ -41,11 +41,12 @@ Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
   * [`setup` and `ctx`](#setup-and-ctx)
     + [peek and untracked](#peek-and-untracked)
 - [Templates](#templates)
-- [Subpaths](#subpaths)
+- [Subpath Exports](#subpath-exports)
   * [`microtags/context`](#microtagscontext)
   * [`microtags/render`](#microtagsrender)
-    + [`render`](#render)
     + [`renderList`](#renderlist)
+    + [`render`](#render)
+    + [Templates](#templates-1)
 - [Divergence from nanotags](#divergence-from-nanotags)
 
 <!-- tocstop -->
@@ -532,11 +533,11 @@ ctx.effect(() => {
 element as their second argument. A
 [`<template>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/template)
 is a native HTML element that holds markup the browser parses but does not
-render. Its contents are inert: nothing inside paints, scripts do not run,
+render. Its contents are inert. Nothing inside paints, scripts do not run,
 images and other resources do not load, and the nodes stay out of the
 document until you clone them.
 
-You write the markup for one item once, inside the template, and the
+You write the markup for an item inside the template, and the
 reconciler stamps out a copy per item by cloning `template.content`. The
 template's first element child is the unit that gets cloned, so give each
 template a single root element.
@@ -555,7 +556,7 @@ template a single root element.
 
 The component resolves the list and the template as refs, then calls
 `renderList` from inside an effect so the list re-renders whenever the
-data signal changes:
+data signal changes.
 
 ```ts
 import { define } from 'microtags'
@@ -592,11 +593,11 @@ define('item-list')
 
 Because the template lives in your HTML instead of a JavaScript string, each
 render clones real DOM nodes rather than re-parsing HTML, and the `update`
-callback assigns through DOM properties like `textContent`. Nothing
-concatenates strings into markup, so there is no string-injection XSS
-surface.
+callback function mutates the DOM through properties like `textContent`.
+Nothing concatenates strings into markup, so there is no string-injection
+XSS vector.
 
-## Subpaths
+## Subpath Exports
 
 ### `microtags/context`
 
@@ -665,34 +666,31 @@ signal imperatively.
 
 ### `microtags/render`
 
-A tiny keyed reconciler for rendering lists and single items from a
+A keyed reconciler for rendering lists and single items from a
 `<template>`, with no virtual DOM and no diffing library.
 
-#### `render`
-
-```ts
-function render<T, E extends Element = Element> (
-    container:Element,
-    template:HTMLTemplateElement,
-    options?:{
-        data?:T;
-        update?:(el:E, item:T) => void;
-    }
-):void
-```
-
-Microtags state is reactive. When a signal changes, you want the DOM to follow.
+Microtags' state is reactive. When a signal changes, you want the DOM to follow.
 A way to do that for a list is to rebuild the markup on every change,
 e.g. `container.innerHTML = items.map(toHTML).join('')`.
 
-That works, but it throws away and recreates every node on every update,
-even the ones that did not change. Recreated nodes lose whatever state the
-browser was holding for them, for example focus state, text selection, scroll
-position, in-flight CSS transitions, and the internal state of elements
-like `<video>`, `<details>`, or `<iframe>`. It also re-parses HTML on
-every pass and invites string-concatenation XSS.
+But rebuilding the markup on every change
+**throws away and recreates every node on every update**, losing any DOM
+state, like focus, text selection, scroll position, and the internal state of
+elements like `<video>`, `<details>`, and `<iframe>`. It also re-parses HTML on
+every pass, which creates a vector for string-concatenation XSS.
+
+**This library exports a `renderList` and a `render` function**.
+They diff against the live DOM. See
+[example/render-demo.ts](./example/render-demo.ts) for a working example.
 
 #### `renderList`
+
+Each item is matched to an existing element by its `key` attribute, so nodes
+are reused across renders rather than being recreated. Nodes whose keys
+disappear from the data are removed, surviving nodes are moved into place
+with the fewest DOM operations, and your `update` callback runs only for
+items whose value actually changed (compared by identity). Focus state and other
+DOM state survives a re-render, and changing one row touches only that row.
 
 ```ts
 function renderList<T, E extends Element = Element> (
@@ -706,44 +704,25 @@ function renderList<T, E extends Element = Element> (
 ):void
 ```
 
-This library exports a `renderList` function. It diffs against the live DOM.
-Each item is matched to an existing element by its `key`, so nodes are reused
-across renders rather than being recreated. Nodes whose keys disappear from the
-data are removed, surviving nodes are moved into place with the fewest DOM
-operations, and your `update` callback runs only for items whose value
-actually changed (compared by identity). Stable nodes mean focus and the rest
-survive a re-render, and changing one row touches only that row.
+##### `renderList` Example
 
-`render` is the same machinery for a single item: it keys on the template, so
-repeated calls update the same element in place instead of replacing it.
+The markup is the list container plus a `<template>` for one row:
 
-#### `render` Example
-
-```ts
-import { render, renderList } from 'microtags/render'
-
-// Render a single item into a container from a <template>.
-render(container, template, {
-    data: item,
-    update: (el, item) => {
-        el.querySelector('span')!.textContent = item.name
-    },
-})
-
-// Render a keyed list with minimal DOM mutations.
-renderList(container, template, {
-    data: items,
-    key: item => item.id,
-    update: (el, item) => { /* update el from item */ },
-})
+```html
+<ul></ul>
+<template>
+    <li>
+        <span class="name"></span>
+    </li>
+</template>
 ```
 
-Call either one from inside an effect so it re-runs whenever the data signal
-changes:
+Call `renderList` from inside an effect so it re-runs whenever the data
+signal changes:
 
 ```ts
 ctx.effect(() => {
-    renderList(ctx.refs.list, rowTemplate, {
+    renderList(ctx.refs.list, ctx.refs.row, {
         data: items(),
         key: item => item.id,
         update: (el, item) => {
@@ -753,10 +732,57 @@ ctx.effect(() => {
 })
 ```
 
+#### `render`
+
+`render` is the same machinery for a single item. It keys on the template, so
+repeated calls update the same element in place instead of replacing it.
+
+```ts
+function render<T, E extends Element = Element> (
+    container:Element,
+    template:HTMLTemplateElement,
+    options?:{
+        data?:T;
+        update?:(el:E, item:T) => void;
+    }
+):void
+```
+
+##### `render` Example
+
+The markup is a container plus a single-item `<template>`:
+
+```html
+<div class="item"></div>
+<template>
+    <div>
+        <span></span>
+    </div>
+</template>
+```
+
+```ts
+import { render } from 'microtags/render'
+
+// Render a single item into the container from the <template>.
+render(container, template, {
+    data: item,
+    update: (el, item) => {
+        el.querySelector('span')!.textContent = item.name
+    },
+})
+```
+
 For a runnable version, see `example/render-demo.ts`. It keeps an editable
 `<input>` in every row and a single item panel rendered with `render`, then
 re-renders on a timer and reorders on demand to show that focus, caret, and
 typed text survive: keyed nodes are reused and at most moved, never rebuilt.
+
+#### Templates
+
+
+
+---
 
 ## Divergence from nanotags
 
