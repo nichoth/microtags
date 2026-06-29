@@ -111,6 +111,14 @@ export type RefsMap<Defs extends Record<string, RefDef>> = {
 export type BindOptions = { prop?:string; event?:string }
 
 /**
+ * A type-only helper that narrows `CustomEvent` to a specific `target`
+ * and `detail`. Combine with `HTMLElementEventMap` augmentation for
+ * app-wide type-safe events that flow through `ctx.emit` and `ctx.on`.
+ */
+export type TypedEvent<T extends EventTarget, D = unknown> =
+    CustomEvent<D> & { target:T }
+
+/**
  * The setup context (ctx) passed to every component's setup() callback.
  * This is the shape declaration so factory.ts and define.ts can typecheck
  * against it before setup-context.ts is implemented.

@@ -40,6 +40,7 @@ Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
   * [`withContexts`](#withcontexts)
   * [`setup` and `ctx`](#setup-and-ctx)
     + [peek and untracked](#peek-and-untracked)
+  * [Typed Events](#typed-events)
 - [Templates](#templates)
 - [Subpath Exports](#subpath-exports)
   * [`microtags/context`](#microtagscontext)
@@ -574,6 +575,37 @@ ctx.effect(() => {
     untracked(() => {
         // reads inside here do not subscribe either
     })
+})
+```
+
+### Typed Events
+
+`TypedEvent<Target, Detail>` is a type-only helper that narrows
+`CustomEvent` to a specific `target` and `detail`. Combine it with
+`HTMLElementEventMap` augmentation for app-wide type-safe events that
+flow through `ctx.emit` and `ctx.on`:
+
+```ts
+import type { TypedEvent } from 'microtags'
+
+type TabsChangedEvent = TypedEvent<
+    InstanceType<typeof XTabs>,
+    { index:number }
+>
+
+declare global {
+    interface HTMLElementEventMap {
+        'tabs:changed':TabsChangedEvent
+    }
+}
+
+// Emitting from setup:
+ctx.emit('tabs:changed', { index: 2 })
+
+// Listening, fully typed:
+ctx.on(tabsEl, 'tabs:changed', ev => {
+    ev.target   // the XTabs instance
+    ev.detail   // { index:number }
 })
 ```
 

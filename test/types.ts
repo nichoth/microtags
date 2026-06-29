@@ -4,6 +4,7 @@ import type {
     RefsMap,
     SingleRefDef,
     MultipleRefDef,
+    TypedEvent,
 } from '../src/types.js'
 
 /**
@@ -104,3 +105,19 @@ type _refKeys = Expect<Equal<
 // A component that declares no refs still exposes an empty `.refs` map.
 const _noRefsProbe = define('mt-norefs-probe').setup(() => {})
 type _refsEmpty = Expect<Equal<keyof typeof _noRefsProbe.refs, never>>
+
+// TypedEvent narrows `detail` to D, and D defaults to `unknown`.
+type _evtDetail = Expect<Equal<
+    TypedEvent<HTMLElement, { index:number }>['detail'],
+    { index:number }
+>>
+type _evtDetailDefault = Expect<Equal<
+    TypedEvent<HTMLElement>['detail'],
+    unknown
+>>
+
+// TypedEvent narrows `target` to T while staying a CustomEvent.
+class XTabs extends HTMLElement {}
+declare const _tabsEvt:TypedEvent<XTabs, { index:number }>
+expectAssignable<XTabs>(_tabsEvt.target)
+expectAssignable<CustomEvent>(_tabsEvt)
