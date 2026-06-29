@@ -49,7 +49,7 @@ Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
     + [Templates](#templates-1)
 - [Divergence from `nanotags`](#divergence-from-nanotags)
   * [Reactivity primitive](#reactivity-primitive)
-  * [Effects track their reads](#effects-track-their-reads)
+  * [Effects + Subscriptions](#effects--subscriptions)
   * [Refs: `r.all` instead of `r.many`](#refs-rall-instead-of-rmany)
   * [Context API](#context-api)
   * [Props](#props-1)
@@ -843,9 +843,9 @@ typed text survive: keyed nodes are reused and at most moved, never rebuilt.
 Props declared with `withProps` are signals. There is no `$` prefix convention;
 all prop names are plain identifiers.
 
-### Effects track their reads
+### Effects + Subscriptions
 
-The largest difference. nanotags' `ctx.effect` takes the store(s) to watch
+The biggest difference. nanotags' `ctx.effect` takes the store(s) to watch
 explicitly and hands the value to the callback:
 
 ```ts
@@ -855,8 +855,8 @@ ctx.effect(ctx.props.$count, count => {
 })
 ```
 
-microtags' `ctx.effect` takes a zero-argument function and tracks whichever
-signals are read inside it, the `alien-signals` model:
+`microtags`'s `ctx.effect` takes a zero-argument function and tracks whichever
+signals are read inside it (the `alien-signals` model):
 
 ```ts
 // microtags
@@ -880,7 +880,7 @@ missing element in both.
 
 ### Context API
 
-The context surface is shaped differently. See
+The context API is shaped differently. See
 [`microtags/context`](#microtagscontext).
 
 | nanotags | microtags |
@@ -911,3 +911,9 @@ These nanotags APIs have no microtags equivalent:
   assign members back onto the element.
 - The `define(name, setupFn)` two-argument shorthand -- always use the
   builder chain ending in `.setup()`.
+
+### Additions
+
+* Serverside-compatible API -- see [serverside example](#serverside-example) --
+  we expose `.TAG` and `.refs` on your component, which can be imported in a
+  server environment.
