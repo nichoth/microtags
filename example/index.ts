@@ -3,6 +3,7 @@ import { define } from '../src/index.js'
 import './count-button.js'
 import './copy-button.js'
 import './subscribe-form.js'
+import './render-demo.js'
 
 // these web coponents depend on having HTML already rendered.
 

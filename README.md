@@ -36,13 +36,16 @@ Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
   * [Refs](#refs)
     + [`withRefs`](#withrefs)
     + [Element types](#element-types)
-  * [define](#define)
-  * [withContexts](#withcontexts)
-  * [setup and ctx](#setup-and-ctx)
+  * [`define`](#define)
+  * [`withContexts`](#withcontexts)
+  * [`setup` and `ctx`](#setup-and-ctx)
     + [peek and untracked](#peek-and-untracked)
+- [Templates](#templates)
 - [Subpaths](#subpaths)
-  * [microtags/context](#microtagscontext)
-  * [microtags/render](#microtagsrender)
+  * [`microtags/context`](#microtagscontext)
+  * [`microtags/render`](#microtagsrender)
+    + [`render`](#render)
+    + [`renderList`](#renderlist)
 - [Divergence from nanotags](#divergence-from-nanotags)
 
 <!-- tocstop -->
@@ -356,8 +359,8 @@ it instead. Queries are resolved relative to the host element, during
 
 ```ts
 .withRefs(r => ({
-    button: r.one(),   // resolves [data-ref="button"] — throws if missing
-    items:  r.all(),   // resolves all [data-ref="items"] — empty array if none
+    button: r.one(),   // resolves [data-ref="button"] (throws if missing)
+    items:  r.all(),   // resolves all [data-ref="items"] (empty array if none)
 }))
 ```
 
@@ -407,46 +410,83 @@ constrained to `HTMLElement`, so cast at the use site if you need one
 (e.g. `ctx.refs.icon as unknown as SVGSVGElement`).
 
 
-### define
+### `define`
 
 ```ts
 import { define } from 'microtags'
 
-define(tagName: string): ComponentBuilder
+define(tagName:string):ComponentBuilder
 ```
 
 Returns a fluent builder. Call `.setup()` to register the custom element.
 All builder methods are chainable and fully type-inferred.
 
-### withContexts
+### `withContexts`
+
+Context is for the case where a parent component defines some state, e.g. a
+`theme`, and the top-level (application) knows nothing about the theme. But the
+top level application does determine what children the parent renders
+(it passes in children), and the children need to know the theme.
+
+In that case, there is no way for the "parent" component to pass the theme to
+the children, and the root level (application) doesn't know what the theme is.
+
+Context gives us a "pull" based way to model this. The context-provider
+publishes the value, and any descendants opt in (or pull values) with
+`withContexts`, and the unknown-consumer and late-arrival problems are handled. 
+
+>
+> [!IMPORTANT]  
+> Context is only relevant on the client-side.
+> Context gives you nothing for first paint or the no-JS case.
+>
+
 
 ```ts
-import { createContext } from 'microtags/context'
+import { define } from 'microtags'
+import { createContext, provide } from 'microtags/context'
 
 const ThemeToken = createContext<string>()
 
-define('my-child')
+// Parent: owns the theme and publishes it to its descendants. It does
+// not reference the children below. The application composes those in.
+define('theme-provider')
+    .setup(ctx => {
+        ctx.onCleanup(provide(ctx.host, ThemeToken, 'dark'))
+    })
+
+// Child: opts in to the theme and reads whichever provider it is
+// composed into. It never receives the value as a prop.
+define('themed-card')
     .withContexts(() => ({
         theme: ThemeToken,
     }))
     .setup(ctx => {
         ctx.effect(() => {
-            console.log('theme is', ctx.contexts.theme)
+            ctx.host.dataset.theme = ctx.contexts.theme
         })
     })
 ```
 
-`setup()` is deferred until all required contexts resolve. See
-[microtags/context](#microtagscontext) for the provider API.
+```html
+<!-- The application writes this markup. It nests <themed-card> inside
+     <theme-provider> but never sets the theme itself. -->
+<theme-provider>
+    <themed-card>Card content</themed-card>
+</theme-provider>
+```
 
-### setup and ctx
+`setup()` is deferred until all required contexts resolve. See
+[`microtags/context`](#microtagscontext) for the provider API.
+
+### `setup` and `ctx`
 
 ```ts
 .setup(ctx => {
-    // ctx.host       — the HTMLElement itself
-    // ctx.props      — callable signals for each declared prop
-    // ctx.refs       — resolved DOM refs
-    // ctx.contexts   — consumed context values (reactive)
+    // ctx.host       the HTMLElement itself
+    // ctx.props      callable signals for each declared prop
+    // ctx.refs       resolved DOM refs
+    // ctx.contexts   consumed context values (reactive)
 
     // Run a tracked effect; auto-disposed on disconnect.
     ctx.effect(() => {
@@ -486,28 +526,198 @@ ctx.effect(() => {
 })
 ```
 
-## Subpaths
+## Templates
 
-### microtags/context
+[`render` and `renderList`](#microtagsrender) both take a `<template>`
+element as their second argument. A
+[`<template>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/template)
+is a native HTML element that holds markup the browser parses but does not
+render. Its contents are inert: nothing inside paints, scripts do not run,
+images and other resources do not load, and the nodes stay out of the
+document until you clone them.
 
-Cross-component context backed by alien-signals.
+You write the markup for one item once, inside the template, and the
+reconciler stamps out a copy per item by cloning `template.content`. The
+template's first element child is the unit that gets cloned, so give each
+template a single root element.
+
+```html
+<item-list>
+    <ul></ul>
+    <template>
+        <li>
+            <span class="name"></span>
+            <span class="count"></span>
+        </li>
+    </template>
+</item-list>
+```
+
+The component resolves the list and the template as refs, then calls
+`renderList` from inside an effect so the list re-renders whenever the
+data signal changes:
 
 ```ts
-import { createContext, provide, resolveContextSignal } from 'microtags/context'
+import { define } from 'microtags'
+import { signal } from 'alien-signals'
+import { renderList } from 'microtags/render'
+
+type Item = { id:string; name:string; count:number }
+
+define('item-list')
+    .withRefs(r => ({
+        list: r.one('ul'),
+        row: r.one('template'),  // typed as HTMLTemplateElement
+    }))
+    .setup(ctx => {
+        const items = signal<Item[]>([
+            { id: 'a', name: 'Alice', count: 1 },
+            { id: 'b', name: 'Bob', count: 2 },
+        ])
+
+        // Re-runs on every items() change; only changed rows are touched.
+        ctx.effect(() => {
+            renderList(ctx.refs.list, ctx.refs.row, {
+                data: items(),
+                key: item => item.id,
+                update: (el, item) => {
+                    el.querySelector('.name')!.textContent = item.name
+                    el.querySelector('.count')!.textContent =
+                        String(item.count)
+                },
+            })
+        })
+    })
+```
+
+Because the template lives in your HTML instead of a JavaScript string, each
+render clones real DOM nodes rather than re-parsing HTML, and the `update`
+callback assigns through DOM properties like `textContent`. Nothing
+concatenates strings into markup, so there is no string-injection XSS
+surface.
+
+## Subpaths
+
+### `microtags/context`
+
+Cross-component context backed by alien-signals. A provider shares a value
+with everything nested inside it; a consumer reads the value from its nearest
+provider ancestor and reacts when it changes.
+
+`provide` seeds a signal the first time it runs and updates that same signal
+on later calls, so re-providing inside an effect pushes changes to consumers.
+
+```ts
+import { define } from 'microtags'
+import { signal } from 'alien-signals'
+import { createContext, provide } from 'microtags/context'
 
 const ThemeToken = createContext<string>()
 
-// In a provider component's setup():
-const cleanup = provide(ctx.host, ThemeToken, 'dark')
-ctx.onCleanup(cleanup)
+// Provider: owns the theme and shares it with its descendants.
+define('theme-provider')
+    .withRefs(r => ({
+        toggle: r.one('button'),
+    }))
+    .setup(ctx => {
+        const theme = signal('light')
 
-// In a consumer component via withContexts:
-ctx.contexts.theme   // 'dark' (reactive — re-runs effects when value changes)
+        // Share with descendants; remove the entry on disconnect.
+        ctx.onCleanup(provide(ctx.host, ThemeToken, theme()))
+
+        // Re-provide on change. provide() updates the existing signal,
+        // so consumers that read this value re-run.
+        ctx.effect(() => provide(ctx.host, ThemeToken, theme()))
+
+        ctx.on(ctx.refs.toggle, 'click', () => {
+            theme(theme() === 'light' ? 'dark' : 'light')
+        })
+    })
+
+// Consumer: reads the nearest provider's theme, reactively.
+define('themed-card')
+    .withContexts(() => ({
+        theme: ThemeToken,
+    }))
+    .setup(ctx => {
+        // Reading ctx.contexts.theme inside an effect subscribes to it,
+        // so this re-runs whenever the provider toggles the value.
+        ctx.effect(() => {
+            ctx.host.dataset.theme = ctx.contexts.theme
+        })
+    })
 ```
 
-### microtags/render
+```html
+<theme-provider>
+    <button>Toggle theme</button>
+    <themed-card>Card A</themed-card>
+    <themed-card>Card B</themed-card>
+</theme-provider>
+```
 
-DOM diffing helpers for rendering lists and single items without a virtual DOM.
+Both cards resolve to the same nearest `<theme-provider>`, so one click
+updates both. `resolveContextSignal(element, token)` is the low-level lookup
+those reads use under the hood; reach for it only when you need the provider
+signal imperatively.
+
+---
+
+### `microtags/render`
+
+A tiny keyed reconciler for rendering lists and single items from a
+`<template>`, with no virtual DOM and no diffing library.
+
+#### `render`
+
+```ts
+function render<T, E extends Element = Element> (
+    container:Element,
+    template:HTMLTemplateElement,
+    options?:{
+        data?:T;
+        update?:(el:E, item:T) => void;
+    }
+):void
+```
+
+Microtags state is reactive. When a signal changes, you want the DOM to follow.
+A way to do that for a list is to rebuild the markup on every change,
+e.g. `container.innerHTML = items.map(toHTML).join('')`.
+
+That works, but it throws away and recreates every node on every update,
+even the ones that did not change. Recreated nodes lose whatever state the
+browser was holding for them, for example focus state, text selection, scroll
+position, in-flight CSS transitions, and the internal state of elements
+like `<video>`, `<details>`, or `<iframe>`. It also re-parses HTML on
+every pass and invites string-concatenation XSS.
+
+#### `renderList`
+
+```ts
+function renderList<T, E extends Element = Element> (
+    container:Element,
+    template:HTMLTemplateElement,
+    options:{
+        data:readonly T[];
+        key:(item:T, index:number) => string|number;
+        update:(el:E, item:T) => void;
+    }
+):void
+```
+
+This library exports a `renderList` function. It diffs against the live DOM.
+Each item is matched to an existing element by its `key`, so nodes are reused
+across renders rather than being recreated. Nodes whose keys disappear from the
+data are removed, surviving nodes are moved into place with the fewest DOM
+operations, and your `update` callback runs only for items whose value
+actually changed (compared by identity). Stable nodes mean focus and the rest
+survive a re-render, and changing one row touches only that row.
+
+`render` is the same machinery for a single item: it keys on the template, so
+repeated calls update the same element in place instead of replacing it.
+
+#### `render` Example
 
 ```ts
 import { render, renderList } from 'microtags/render'
@@ -515,7 +725,9 @@ import { render, renderList } from 'microtags/render'
 // Render a single item into a container from a <template>.
 render(container, template, {
     data: item,
-    update: (el, item) => { el.querySelector('span')!.textContent = item.name },
+    update: (el, item) => {
+        el.querySelector('span')!.textContent = item.name
+    },
 })
 
 // Render a keyed list with minimal DOM mutations.
@@ -525,6 +737,26 @@ renderList(container, template, {
     update: (el, item) => { /* update el from item */ },
 })
 ```
+
+Call either one from inside an effect so it re-runs whenever the data signal
+changes:
+
+```ts
+ctx.effect(() => {
+    renderList(ctx.refs.list, rowTemplate, {
+        data: items(),
+        key: item => item.id,
+        update: (el, item) => {
+            el.querySelector('.name')!.textContent = item.name
+        },
+    })
+})
+```
+
+For a runnable version, see `example/render-demo.ts`. It keeps an editable
+`<input>` in every row and a single item panel rendered with `render`, then
+re-renders on a timer and reorders on demand to show that focus, caret, and
+typed text survive: keyed nodes are reused and at most moved, never rebuilt.
 
 ## Divergence from nanotags
 
@@ -536,8 +768,4 @@ renderList(container, template, {
 | `ctx.props.$count` (store) | `ctx.props.count` (callable signal) |
 
 Props declared with `withProps` are native alien-signals callable signals.
-There is no `$` prefix convention — all prop names are plain identifiers.
-
-```
-/ed3d-plan-and-execute:execute-implementation-plan /Users/nick/code/_microtags/docs/implementation-plans/2026-06-28-zod-validation-example/ /Users/nick/code/_microtags/
-```
+There is no `$` prefix convention; all prop names are plain identifiers.
