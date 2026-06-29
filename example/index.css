@@ -1,12 +1,18 @@
 :root {
     --error: red;
+    --theme-light-bg: #f5f5f5;
+    --theme-light-fg: #1a1a1a;
+    --theme-dark-bg: #1a1a1a;
+    --theme-dark-fg: #f5f5f5;
+    --theme-border: #777;
 }
 
 body {
     font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
 }
 
-my-counter, count-button, copy-btn, subscribe-form, render-demo {
+my-counter, count-button, copy-btn, subscribe-form, render-demo,
+theme-provider, themed-card {
     &:not(:defined) {
         display: none;
     }
@@ -176,5 +182,38 @@ my-counter [data-ref="display"] {
 
     & .summary {
         margin-top: 1rem;
+    }
+}
+
+.theme-demo {
+    margin: 2rem 0;
+
+    & p {
+        max-width: 34rem;
+    }
+
+    & theme-provider {
+        display: block;
+        padding: 1rem;
+        margin-top: 1rem;
+        border: 1px dashed var(--theme-border);
+    }
+
+    & themed-card {
+        display: block;
+        padding: 1rem;
+        margin: 0.5rem 0;
+        border: 1px solid var(--theme-border);
+        transition: background-color 0.2s, color 0.2s;
+    }
+
+    & themed-card[data-theme="light"] {
+        background-color: var(--theme-light-bg);
+        color: var(--theme-light-fg);
+    }
+
+    & themed-card[data-theme="dark"] {
+        background-color: var(--theme-dark-bg);
+        color: var(--theme-dark-fg);
     }
 }

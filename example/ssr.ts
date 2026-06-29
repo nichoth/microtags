@@ -3,6 +3,7 @@ import { CopyBtn } from './copy-button.js'
 import { CountBtn } from './count-button.js'
 import { SubscribeForm } from './subscribe-form.js'
 import { RenderDemo } from './render-demo.js'
+import { ThemeProvider, ThemedCard } from './theme-toggle.js'
 import { NBSP } from './constants.js'
 
 // Server-render the full example page using each component's exposed
@@ -108,6 +109,28 @@ function renderRenderDemo ():string {
         </section>`
 }
 
+function renderThemeToggle ():string {
+    return `
+        <section class="theme-demo">
+            <h2>Context: nearest provider wins</h2>
+            <p>The outer provider themes Card A and Card B. The nested
+                provider themes only Card C: toggling the outer leaves
+                Card C alone, and toggling the nested one leaves A and B
+                alone.</p>
+
+            <${ThemeProvider.TAG} theme="light">
+                <button>Toggle outer theme</button>
+                <${ThemedCard.TAG}>Card A</${ThemedCard.TAG}>
+                <${ThemedCard.TAG}>Card B</${ThemedCard.TAG}>
+
+                <${ThemeProvider.TAG} theme="dark">
+                    <button>Toggle nested card</button>
+                    <${ThemedCard.TAG}>Card C</${ThemedCard.TAG}>
+                </${ThemeProvider.TAG}>
+            </${ThemeProvider.TAG}>
+        </section>`
+}
+
 export function render ():string {
     return `<!DOCTYPE html>
 <html lang="en">
@@ -119,7 +142,7 @@ export function render ():string {
     <noscript>
         <style>
             my-counter, count-button, copy-btn, subscribe-form,
-            render-demo {
+            render-demo, theme-provider, themed-card {
                 display: initial!important;
             }
         </style>
@@ -132,6 +155,7 @@ export function render ():string {
 ${renderCounter()}
 ${renderSubscribeForm()}
 ${renderRenderDemo()}
+${renderThemeToggle()}
     </main>
     <script type="module" src="./index.ts"></script>
 </body>

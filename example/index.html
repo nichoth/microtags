@@ -8,7 +8,7 @@
     <noscript>
         <style>
             my-counter, count-button, copy-btn, subscribe-form,
-            render-demo {
+            render-demo, theme-provider, themed-card {
                 display: initial!important;
             }
         </style>
@@ -84,7 +84,7 @@
                     Shuffle order
                 </button>
 
-                <template data-ref="rowTpl">
+                <template data-ref="rowTemplate">
                     <li>
                         <span class="label"></span>
                         <input class="note" aria-label="editable note"
@@ -103,6 +103,25 @@
                     </span>
                 </template>
             </render-demo>
+        </section>
+
+        <section class="theme-demo">
+            <h2>Context: nearest provider wins</h2>
+            <p>The outer provider themes Card A and Card B. The nested
+                provider themes only Card C: toggling the outer leaves
+                Card C alone, and toggling the nested one leaves A and B
+                alone.</p>
+
+            <theme-provider theme="light">
+                <button>Toggle outer theme</button>
+                <themed-card>Card A</themed-card>
+                <themed-card>Card B</themed-card>
+
+                <theme-provider theme="dark">
+                    <button>Toggle nested card</button>
+                    <themed-card>Card C</themed-card>
+                </theme-provider>
+            </theme-provider>
         </section>
     </main>
     <script type="module" src="./index.ts"></script>

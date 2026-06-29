@@ -4,6 +4,7 @@ import './count-button.js'
 import './copy-button.js'
 import './subscribe-form.js'
 import './render-demo.js'
+import './theme-toggle.js'
 
 // these web coponents depend on having HTML already rendered.
 
