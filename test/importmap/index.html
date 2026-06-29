@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>microtags import map test</title>
+
+    <!--
+      Resolve bare specifiers to the pre-bundled (self-contained) builds.
+      These inline alien-signals, so no dependency mapping or network
+      access is needed. Served from the repo root by test/importmap/run.ts.
+    -->
+    <script type="importmap">
+    {
+        "imports": {
+            "microtags": "/dist/index.min.js",
+            "microtags/render": "/dist/render.min.js",
+            "microtags/context": "/dist/context.min.js"
+        }
+    }
+    </script>
+</head>
+
+<body>
+    <imt-widget start="5">
+        <div data-ref="display"></div>
+    </imt-widget>
+
+    <!--
+      Bare-specifier imports below are resolved by the import map above.
+      This is the usage style we are proving works in a real browser.
+    -->
+    <script type="module">
+        import { define, peek, untracked } from 'microtags'
+        import { render, renderList } from 'microtags/render'
+        import {
+            createContext,
+            provide,
+            resolveContextSignal,
+        } from 'microtags/context'
+
+        const results = []
+        const ok = (name, cond) => results.push({ name, ok: !!cond })
+
+        const nextFrame = () =>
+            new Promise(r => requestAnimationFrame(() => r()))
+
+        ;(async () => {
+            try {
+                // Main entry resolved via the import map.
+                ok('microtags resolves (define is a function)',
+                    typeof define === 'function')
+                ok('microtags re-exports peek', typeof peek === 'function')
+                ok('microtags re-exports untracked',
+                    typeof untracked === 'function')
+
+                // Subpaths follow the same URL pattern.
+                ok('microtags/render resolves',
+                    typeof render === 'function' &&
+                    typeof renderList === 'function')
+                ok('microtags/context resolves',
+                    typeof createContext === 'function')
+
+                // Drive a real component through the imported module.
+                let effectRuns = 0
+                let lastSeen = null
+                let resolvedDisplay = null
+
+                define('imt-widget')
+                    .withProps(p => ({ start: p.number() }))
+                    .withRefs(r => ({ display: r.one() }))
+                    .setup(ctx => {
+                        resolvedDisplay = ctx.refs.display
+                        ctx.effect(() => {
+                            effectRuns++
+                            lastSeen = ctx.props.start()
+                        })
+                    })
+
+                await customElements.whenDefined('imt-widget')
+                await nextFrame()
+
+                const el = document.querySelector('imt-widget')
+                const Ctor = customElements.get('imt-widget')
+                ok('custom element registered', !!Ctor)
+                ok('existing element upgraded', el instanceof Ctor)
+                ok('setup ran and effect is wired', effectRuns >= 1)
+                ok('attribute coerced to a number via the prop signal',
+                    lastSeen === 5)
+                ok('data-ref resolved to the child element',
+                    resolvedDisplay ===
+                        el.querySelector('[data-ref="display"]'))
+
+                // Reactivity: changing the observed attribute re-runs effects.
+                const runsBefore = effectRuns
+                el.setAttribute('start', '10')
+                await nextFrame()
+                ok('effect re-ran after the prop changed',
+                    effectRuns > runsBefore)
+                ok('effect observed the updated value', lastSeen === 10)
+
+                // render subpath does real DOM work.
+                const container = document.createElement('div')
+                const tpl = document.createElement('template')
+                tpl.innerHTML = '<p></p>'
+                render(container, tpl, {
+                    data: { id: 1 },
+                    update: node => { node.dataset.rendered = 'yes' },
+                })
+                ok('render() cloned the template into the container',
+                    container.childElementCount === 1 &&
+                    container.firstElementChild.dataset.rendered === 'yes')
+
+                // context subpath does real work across the module.
+                const token = createContext()
+                const host = document.createElement('div')
+                const child = document.createElement('span')
+                host.appendChild(child)
+                provide(host, token, 'dark')
+                const sig = resolveContextSignal(child, token)
+                ok('context provide/resolve works',
+                    typeof sig === 'function' && sig() === 'dark')
+            } catch (err) {
+                results.push({
+                    name: 'uncaught error: ' + ((err && err.message) || err),
+                    ok: false,
+                })
+            }
+
+            window.__IMPORTMAP_RESULTS__ = results
+            window.testsFinished = true
+        })()
+    </script>
+</body>
+</html>

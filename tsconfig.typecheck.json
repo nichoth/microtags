@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "listFiles": false
+  },
+  "exclude": ["example/ssr.ts"]
+}
