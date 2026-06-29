@@ -1327,3 +1327,8 @@ test('renderList: skips update when data item is unchanged', t => {
 
     t.equal(updateCount, 1, 'update called only once when item is same ref')
 })
+
+test('all done', () => {
+    // @ts-expect-error tests
+    window.testsFinished = true
+})
