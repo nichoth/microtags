@@ -49,7 +49,7 @@ Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
     + [`render`](#render)
   * [`microtags/util`](#microtagsutil)
     + [Coercion](#coercion)
-    + [`runCleanups`](#runcleanups)
+    + [`runAll`](#runall)
     + [`toAttributes`](#toattributes)
 - [Divergence from `nanotags`](#divergence-from-nanotags)
   * [Reactivity primitive](#reactivity-primitive)
@@ -878,7 +878,8 @@ import {
     coerceString,
     coerceBoolean,
     coerceJson,
-    runCleanups,
+    runAll,
+    toAttributes
 } from 'microtags/util'
 ```
 
@@ -904,14 +905,14 @@ function coerceJson<T = unknown> (raw:string | null):T | undefined
 - `coerceJson` -- `JSON.parse(raw)`, or `undefined` when the attribute is
   absent or not valid JSON. Pass a type parameter to annotate the result.
 
-#### `runCleanups`
+#### `runAll`
 
 Runs every function in the array, even if some throw. After all have run
 it re-throws the first error encountered, so one failing teardown cannot
 skip the rest. A `Cleanup` is a no-argument teardown function, `() => void`.
 
 ```ts
-function runCleanups (fns:Cleanup[]):void
+function runAll (fns:Cleanup[]):void
 ```
 
 #### `toAttributes`

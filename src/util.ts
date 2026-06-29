@@ -36,10 +36,10 @@ export function coerceJson<T = unknown> (raw:string | null):T | undefined {
 }
 
 /**
- * Run every cleanup in the list, ensuring all run even if some throw.
+ * Run every function in the list, ensuring all run even if some throw.
  * After all have run, re-throws the first error encountered.
  */
-export function runCleanups (fns:(() => void)[]):void {
+export function runAll (fns:(() => void)[]):void {
     let firstError:unknown
     let caught = false
     for (const fn of fns) {

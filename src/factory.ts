@@ -1,5 +1,5 @@
 import { signal } from './reactivity.js'
-import { runCleanups } from './util.js'
+import { runAll } from './util.js'
 import { makeSetupContext } from './setup-context.js'
 import {
     resolveContextSignal,
@@ -197,7 +197,7 @@ export function factory<Props extends FactoryProps = FactoryProps> (
             // and the array is always empty after this returns (or throws).
             const fns = this._cleanups
             this._cleanups = []
-            runCleanups(fns)
+            runAll(fns)
         }
     }
 
