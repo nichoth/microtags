@@ -46,6 +46,21 @@ export function makeSetupContext<
             })
         },
 
+        emit (
+            nameOrEvent:Event | string,
+            detail?:unknown,
+            options?:Omit<CustomEventInit, 'detail'>
+        ):boolean {
+            const event = nameOrEvent instanceof Event ?
+                nameOrEvent :
+                new CustomEvent(nameOrEvent, {
+                    bubbles: true,
+                    ...options,
+                    detail,
+                })
+            return host.dispatchEvent(event)
+        },
+
         effect (fn) {
             const dispose = effect(fn)
             cleanups.push(dispose)

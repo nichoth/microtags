@@ -573,6 +573,64 @@ test('ctx.on: listener is called and auto-removed on disconnect', t => {
     t.equal(clickCount, 1, 'listener not called after disconnect')
 })
 
+test('ctx.emit: string form dispatches a bubbling CustomEvent with detail', t => {
+    let received:CustomEvent | null = null
+    let returned:boolean | null = null
+    const El = factory({
+        props: {},
+        observedAttrNames: [],
+        setup: (ctx) => {
+            ctx.on(ctx.host, 'click', () => {
+                returned = ctx.emit('ping', { value: 42 })
+            })
+        },
+    })
+    customElements.define('test-ctx-emit', El)
+    const el = document.createElement('test-ctx-emit')
+    const onPing = (ev:Event) => { received = ev as CustomEvent }
+    document.body.addEventListener('ping', onPing)
+    document.body.appendChild(el)
+
+    el.click()
+
+    t.ok(received, 'event bubbled up to document.body')
+    t.equal(received!.detail.value, 42, 'detail passed through')
+    t.equal(returned, true, 'returns dispatchEvent result when not canceled')
+
+    document.body.removeEventListener('ping', onPing)
+    document.body.removeChild(el)
+})
+
+test('ctx.emit: Event form dispatches as-is; returns false when canceled', t => {
+    let returned:boolean | null = null
+    const El = factory({
+        props: {},
+        observedAttrNames: [],
+        setup: (ctx) => {
+            ctx.on(ctx.host, 'click', () => {
+                returned = ctx.emit(
+                    new CustomEvent('boom', {
+                        bubbles: true,
+                        cancelable: true,
+                    })
+                )
+            })
+        },
+    })
+    customElements.define('test-ctx-emit-event', El)
+    const el = document.createElement('test-ctx-emit-event')
+    const onBoom = (ev:Event) => { ev.preventDefault() }
+    document.body.addEventListener('boom', onBoom)
+    document.body.appendChild(el)
+
+    el.click()
+
+    t.equal(returned, false, 'returns false when a listener calls preventDefault')
+
+    document.body.removeEventListener('boom', onBoom)
+    document.body.removeChild(el)
+})
+
 test('ctx.bind: updates DOM property reactively, stops after disconnect', t => {
     const El = factory({
         props: { label: (v:string | null) => (v ?? 'initial') },

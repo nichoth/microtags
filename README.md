@@ -541,6 +541,11 @@ define('themed-card')
     // Add an event listener; auto-removed on disconnect.
     ctx.on(el, 'click', handler)
 
+    // Dispatch an event from the host. Pass a name (with optional
+    // detail/options) for a bubbling CustomEvent, or a pre-built
+    // Event. Returns dispatchEvent's result.
+    ctx.emit('change', { value: 42 })
+
     // Read a signal without creating a subscription.
     const snap = ctx.peek(ctx.props.count)
 
@@ -903,8 +908,6 @@ The context API is shaped differently. See
 
 These nanotags APIs have no microtags equivalent:
 
-- `ctx.emit` -- dispatch from the host directly with
-  `ctx.host.dispatchEvent(...)`.
 - `ctx.getElement` / `ctx.getElements` -- declare refs with `withRefs`, or
   call `ctx.host.querySelector` directly.
 - The `setup` mixin return value -- `setup` returns `void`; it does not
@@ -912,7 +915,7 @@ These nanotags APIs have no microtags equivalent:
 - The `define(name, setupFn)` two-argument shorthand -- always use the
   builder chain ending in `.setup()`.
 
-### Additions
+### Additions / New Features
 
 * Serverside-compatible API -- see [serverside example](#serverside-example) --
   we expose `.TAG` and `.refs` on your component, which can be imported in a

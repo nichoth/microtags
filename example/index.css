@@ -18,6 +18,14 @@ theme-provider, themed-card {
     }
 }
 
+& h2 {
+    margin-bottom: 0.5rem;
+}
+
+p {
+    margin-top: 0.5rem;
+}
+
 main {
     max-width: 40rem;
     margin: 0 auto;
@@ -189,7 +197,7 @@ my-counter [data-ref="display"] {
     margin: 2rem 0;
 
     & p {
-        max-width: 34rem;
+        margin-top: 0;
     }
 
     & theme-provider {

@@ -107,6 +107,11 @@
 
         <section class="theme-demo">
             <h2>Context: nearest provider wins</h2>
+            <p>
+                Context is passed based on the document structure, meaning
+                the "card" coponent gets its context from the most immediate
+                ancestor that provides it.
+            </p>
             <p>The outer provider themes Card A and Card B. The nested
                 provider themes only Card C: toggling the outer leaves
                 Card C alone, and toggling the nested one leaves A and B
