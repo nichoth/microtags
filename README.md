@@ -9,9 +9,9 @@
 [![gzip size](https://img.shields.io/bundlephobia/minzip/microtags?style=flat-square)](https://bundlephobia.com/package/microtags)
 [![license](https://img.shields.io/badge/license-Big_Time-blue?style=flat-square)](LICENSE)
 
-Web component helper with reactive props, automatic cleanup,
-and no Shadow DOM. Reactive via
-[alien-signals](https://github.com/stackblitz/alien-signals).
+Web component helper with reactive props, automatic cleanup, and no
+[Shadow DOM](https://gomakethings.com/the-shadow-dom-is-an-antipattern/).
+Reactive via [alien-signals](https://github.com/stackblitz/alien-signals).
 
 **Size**: 3.41 kB with all dependencies, minified and brotlied
 
