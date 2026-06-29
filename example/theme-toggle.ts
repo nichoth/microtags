@@ -31,7 +31,9 @@ export const ThemeProvider = define('theme-provider')
 
         // Re-provide on change. provide() updates the existing signal in
         // place, so consumers reading this value re-run.
-        ctx.effect(() => provide(ctx.host, ThemeToken, theme()))
+        ctx.effect(() => {
+            provide(ctx.host, ThemeToken, theme())
+        })
 
         ctx.on(ctx.refs.toggle, 'click', () => {
             theme(theme() === 'light' ? 'dark' : 'light')
