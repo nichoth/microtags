@@ -159,6 +159,20 @@ export interface SetupContext<
     ):void
 
     /**
+     * Dispatch an event from the host. Pass a pre-built `Event` to
+     * dispatch it as-is, or a name (plus optional `detail` and
+     * `CustomEventInit` options) to construct and dispatch a
+     * bubbling `CustomEvent`. Returns `dispatchEvent`'s result:
+     * `false` when a cancelable event had `preventDefault()` called.
+     */
+    emit(event:Event):boolean
+    emit<D>(
+        name:string,
+        detail?:D,
+        options?:Omit<CustomEventInit<D>, 'detail'>
+    ):boolean
+
+    /**
      * Run an alien-signals effect that auto-tracks the signals it reads.
      * The effect is auto-disposed on disconnect.
      */
