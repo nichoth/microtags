@@ -7,7 +7,8 @@
     <title>microtags example</title>
     <noscript>
         <style>
-            my-counter, count-button, copy-btn, subscribe-form {
+            my-counter, count-button, copy-btn, subscribe-form,
+            render-demo {
                 display: initial!important;
             }
         </style>
@@ -67,6 +68,41 @@
                     <p class="status" role="status" aria-live="polite"></p>
                 </form>
             </subscribe-form>
+        </section>
+
+        <section class="render-demo">
+            <h2>Keyed rendering preserves state</h2>
+            <render-demo>
+                <p>Type into a row, then watch the tick or press Shuffle.
+                    Your text rides along because rows are reused by key,
+                    never rebuilt; while the list merely re-renders, the
+                    row you are editing even keeps its focus and caret.</p>
+
+                <ul data-ref="list"></ul>
+
+                <button data-ref="shuffle">
+                    Shuffle order
+                </button>
+
+                <template data-ref="rowTpl">
+                    <li>
+                        <span class="label"></span>
+                        <input class="note" aria-label="editable note"
+                            placeholder="type here">
+                    </li>
+                </template>
+
+                <p class="summary" data-ref="summary"></p>
+
+                <template data-ref="summaryTpl">
+                    <span>
+                        <strong class="tick">0</strong> re-renders. Scratch
+                        box keeps focus: 
+                        <input class="scratch" aria-label="scratch"
+                            placeholder="type here">
+                    </span>
+                </template>
+            </render-demo>
         </section>
     </main>
     <script type="module" src="./index.ts"></script>

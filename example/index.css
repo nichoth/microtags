@@ -1,8 +1,12 @@
+:root {
+    --error: red;
+}
+
 body {
     font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
 }
 
-my-counter, count-button, copy-btn, subscribe-form {
+my-counter, count-button, copy-btn, subscribe-form, render-demo {
     &:not(:defined) {
         display: none;
     }
@@ -11,6 +15,33 @@ my-counter, count-button, copy-btn, subscribe-form {
 main {
     max-width: 40rem;
     margin: 0 auto;
+}
+
+input {
+    transition: all 0.2s;
+    font-size: 1rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid;
+    border-radius: 0;
+    outline: 1px solid transparent;
+    font-size: 1rem;
+    padding: 0.4rem 0.75rem;
+    border: 1px solid;
+    border-radius: 0;
+
+    &[aria-invalid="true"] {
+        outline-color: var(--error);
+        border-color: var(--error);
+
+        &:focus, &:focus-visible {
+            border-color: var(--error);
+            outline-color: var(--error);
+        }
+    }
+
+    &:focus, &:focus-visible {
+        outline-color: initial;
+    }
 }
 
 button {
@@ -109,27 +140,41 @@ my-counter [data-ref="display"] {
         font-weight: 600;
     }
 
-    & input {
-        transition: all 0.2s;
-        font-size: 1rem;
-        padding: 0.5rem 1rem;
-        border: 1px solid;
-        border-radius: 0;
-        outline: 2px solid transparent;
-
-        &[aria-invalid="true"] {
-            outline-color: red;
-            border-color: red;
-        }
-    }
-
     & .error {
-        color: red;
+        color: var(--error);
         min-height: 1.25rem;
         margin: 0;
     }
 
     & .status {
         margin: 0;
+    }
+}
+
+.render-demo {
+    margin: 2rem 0;
+
+    & ul {
+        list-style: none;
+        padding: 0;
+    }
+
+    & li {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    & .label {
+        min-width: 4rem;
+    }
+
+    & button {
+        margin-bottom: 1rem;
+    }
+
+    & .summary {
+        margin-top: 1rem;
     }
 }

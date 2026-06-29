@@ -2,6 +2,8 @@ import { myCounter } from './index.js'
 import { CopyBtn } from './copy-button.js'
 import { CountBtn } from './count-button.js'
 import { SubscribeForm } from './subscribe-form.js'
+import { RenderDemo } from './render-demo.js'
+import { NBSP } from './constants.js'
 
 // Server-render the full example page using each component's exposed
 // `.TAG` and `.refs`, so the markup never hardcodes a tag name or a
@@ -68,6 +70,44 @@ function renderSubscribeForm ():string {
         </section>`
 }
 
+function renderRenderDemo ():string {
+    return `
+        <section class="render-demo">
+            <h2>Keyed rendering preserves state</h2>
+            <${RenderDemo.TAG}>
+                <p>Type into a row, then watch the tick or press Shuffle.
+                    Your text rides along because rows are reused by key,
+                    never rebuilt; while the list merely re-renders, the
+                    row you are editing even keeps its focus and caret.</p>
+
+                <ul data-ref="${RenderDemo.refs.list}"></ul>
+
+                <button data-ref="${RenderDemo.refs.shuffle}">
+                    Shuffle order
+                </button>
+
+                <template data-ref="${RenderDemo.refs.rowTemplate}">
+                    <li>
+                        <span class="label"></span>
+                        <input class="note" aria-label="editable note"
+                            placeholder="type here">
+                    </li>
+                </template>
+
+                <p class="summary" data-ref="${RenderDemo.refs.summary}"></p>
+
+                <template data-ref="${RenderDemo.refs.summaryTpl}">
+                    <span>
+                        <strong class="tick">0</strong> re-renders. Scratch
+                        box keeps focus:${NBSP}
+                        <input class="scratch" aria-label="scratch"
+                            placeholder="type here">
+                    </span>
+                </template>
+            </${RenderDemo.TAG}>
+        </section>`
+}
+
 export function render ():string {
     return `<!DOCTYPE html>
 <html lang="en">
@@ -78,7 +118,8 @@ export function render ():string {
     <title>microtags example</title>
     <noscript>
         <style>
-            my-counter, count-button, copy-btn, subscribe-form {
+            my-counter, count-button, copy-btn, subscribe-form,
+            render-demo {
                 display: initial!important;
             }
         </style>
@@ -90,6 +131,7 @@ export function render ():string {
         <h1>microtags example</h1>
 ${renderCounter()}
 ${renderSubscribeForm()}
+${renderRenderDemo()}
     </main>
     <script type="module" src="./index.ts"></script>
 </body>

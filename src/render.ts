@@ -1,21 +1,14 @@
-export type RenderListOptions<T, E extends Element = Element> = {
-    data:readonly T[];
-    key:(item:T, index:number) => string | number;
-    update:(el:E, item:T) => void;
-}
-
-export type RenderOptions<T, E extends Element = Element> = {
-    data?:T;
-    update?:(el:E, item:T) => void;
-}
-
 const elementData = new WeakMap<Element, unknown>()
 const elementKeys = new WeakMap<Element, string | number>()
 
 export function renderList<T, E extends Element = Element> (
     container:Element,
     template:HTMLTemplateElement,
-    options:RenderListOptions<T, E>
+    options:{
+        data:readonly T[];
+        key:(item:T, index:number) => string|number;
+        update:(el:E, item:T) => void;
+    }
 ):void {
     const { data, key: getKey, update } = options
     const existingByKey = new Map<string | number, E>()
@@ -72,7 +65,10 @@ const tplIds = new WeakMap<HTMLTemplateElement, number>()
 export function render<T, E extends Element = Element> (
     container:Element,
     template:HTMLTemplateElement,
-    options?:RenderOptions<T, E>
+    options?:{
+        data?:T;
+        update?:(el:E, item:T) => void;
+    }
 ):void {
     renderList<T, E>(container, template, {
         data: [
