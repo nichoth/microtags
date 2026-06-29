@@ -27,7 +27,8 @@ export const ThemeProvider = define('theme-provider')
 
         // Seed the shared signal; the returned cleanup removes this host's
         // entry on disconnect.
-        ctx.onCleanup(provide(ctx.host, ThemeToken, theme()))
+        const rmContext = provide(ctx.host, ThemeToken, theme())
+        ctx.onCleanup(rmContext)
 
         // Re-provide on change. provide() updates the existing signal in
         // place, so consumers reading this value re-run.

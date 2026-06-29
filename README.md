@@ -471,15 +471,15 @@ All builder methods are chainable and fully type-inferred.
 ### `withContexts`
 
 Context is for the case where a parent component defines some state, e.g. a
-`theme`, and the top-level (application) knows nothing about the theme. But the
-top level application does determine what children the parent renders
-(it passes in children), and the children need to know the theme.
+`theme`, and the top-level (application) knows nothing about the theme, but the
+application does determine what children the parent renders
+(the app passes in children), and the children need to know the theme.
 
 In that case, there is no way for the "parent" component to pass the theme to
-the children, and the root level (application) doesn't know what the theme is.
+the children. The root level (application) doesn't know what the theme is.
 
-Context gives us a "pull" based way to model this. The context-provider
-publishes the value, and any descendants opt in (or pull values) with
+Context gives us a way to model this. The context-provider
+publishes the value, and any descendants opt in with
 `withContexts`, and the unknown-consumer and late-arrival problems are handled. 
 
 >
@@ -499,7 +499,8 @@ const ThemeToken = createContext<string>()
 // not reference the children below. The application composes those in.
 define('theme-provider')
     .setup(ctx => {
-        ctx.onCleanup(provide(ctx.host, ThemeToken, 'dark'))
+        const rmContext = provide(ctx.host, ThemeToken, 'dark')
+        ctx.onCleanup(rmContext)
     })
 
 // Child: opts in to the theme and reads whichever provider it is
@@ -525,6 +526,8 @@ define('themed-card')
 
 `setup()` is deferred until all required contexts resolve. See
 [`microtags/context`](#microtagscontext) for the provider API.
+
+---
 
 ### `setup` and `ctx`
 
@@ -582,16 +585,12 @@ ctx.effect(() => {
 
 `TypedEvent<Target, Detail>` is a type-only helper that narrows
 `CustomEvent` to a specific `target` and `detail`. Combine it with
-`HTMLElementEventMap` augmentation for app-wide type-safe events that
-flow through `ctx.emit` and `ctx.on`:
+`HTMLElementEventMap` augmentation for app-wide type-safe events.
 
 ```ts
 import type { TypedEvent } from 'microtags'
 
-type TabsChangedEvent = TypedEvent<
-    InstanceType<typeof XTabs>,
-    { index:number }
->
+type TabsChangedEvent = TypedEvent<InstanceType<typeof XTabs>, { index:number }>
 
 declare global {
     interface HTMLElementEventMap {
