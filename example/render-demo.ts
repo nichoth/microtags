@@ -3,10 +3,10 @@ import { define } from '../src/index.js'
 import { render, renderList } from '../src/render.js'
 
 /**
- * Demonstrates that keyed rendering preserves browser-held DOM state.
+ * Demonstrates keyed rendering -- preserves DOM state.
  *
  * Each row holds an <input>. The list re-renders on a one-second tick and
- * reorders on Shuffle, yet the text you typed survives both: rows are
+ * reorders on Shuffle click, yet the text you typed survives both: rows are
  * matched by `key`, so renderList reuses the existing <li> (moving it at
  * most) instead of recreating it, and `update` only ever writes the label.
  * Across the constant tick re-renders an unchanged row is left untouched,
