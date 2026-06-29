@@ -23,11 +23,12 @@
     "build": "mkdir -p ./dist && rm -rf ./dist/* && npm run build-cjs && npm run build-esm && npm run build-esm:min",
     "build-html": "npm run --silent ssr > example/index.html",
     "size": "size-limit",
+    "inject-size": "esbuild ./scripts/inject-size.ts --bundle --platform=node --format=cjs | node",
     "start": "npm run build-html && vite",
     "ssr": "esbuild ./example/ssr.ts --bundle --platform=node --format=cjs | node ",
     "toc": "markdown-toc --maxdepth 4 -i README.md",
     "preversion": "npm run lint",
-    "version": "npm run toc && auto-changelog -p --template keepachangelog --breaking-pattern 'BREAKING CHANGE:' && git add CHANGELOG.md README.md",
+    "version": "npm run toc && auto-changelog -p --template keepachangelog --breaking-pattern 'BREAKING CHANGE:' && npm run inject-size && git add CHANGELOG.md README.md",
     "postversion": "git push --follow-tags && npm publish",
     "prepublishOnly": "npm run build"
   },
