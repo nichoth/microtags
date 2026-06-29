@@ -537,6 +537,8 @@ render. Its contents are inert. Nothing inside paints, scripts do not run,
 images and other resources do not load, and the nodes stay out of the
 document until you clone them.
 
+See [./example/ssr.ts, line 89](./example/ssr.ts#L89).
+
 You write the markup for an item inside the template, and the
 reconciler stamps out a copy per item by cloning `template.content`. The
 template's first element child is the unit that gets cloned, so give each
