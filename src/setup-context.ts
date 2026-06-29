@@ -2,7 +2,6 @@ import { effect, peek } from './reactivity.js'
 import { resolveContextSignal } from './context.js'
 import type {
     SetupContext,
-    Cleanup,
     Signal,
     PropsSignals,
     PropDef,
@@ -21,7 +20,7 @@ export function makeSetupContext<
     props:PropsSignals<Props>,
     refs:Record<string, Element | Element[]>,
     contexts:Record<string, unknown>,
-    cleanups:Cleanup[]
+    cleanups:(() => void)[]
 ):SetupContext<Props, any, any> {
     return {
         host,
