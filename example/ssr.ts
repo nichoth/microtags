@@ -86,7 +86,7 @@ function renderRenderDemo ():string {
                     Shuffle order
                 </button>
 
-                <template data-ref="${RenderDemo.refs.rowTpl}">
+                <template data-ref="${RenderDemo.refs.rowTemplate}">
                     <li>
                         <span class="label"></span>
                         <input class="note" aria-label="editable note"

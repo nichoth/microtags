@@ -27,7 +27,7 @@ export const RenderDemo = define('render-demo')
     .withRefs(r => ({
         list: r.one('ul'),
         shuffle: r.one(),  // matches [data-ref="shuffle"]
-        rowTpl: r.one<HTMLTemplateElement>(),  // [data-ref="rowTpl"]
+        rowTemplate: r.one<HTMLTemplateElement>(),  // [data-ref="rowTemplate"]
         summary: r.one(),  // the single-item render container
         summaryTpl: r.one<HTMLTemplateElement>(),  // [data-ref="summaryTpl"]
     }))
@@ -52,7 +52,7 @@ export const RenderDemo = define('render-demo')
         // is moved into place with its <input> intact.
         ctx.effect(() => {
             ticks()  // subscribe so a tick forces this effect to re-run
-            renderList<Row, HTMLLIElement>(ctx.refs.list, ctx.refs.rowTpl, {
+            renderList<Row, HTMLLIElement>(ctx.refs.list, ctx.refs.rowTemplate, {
                 data: rows(),
                 key: row => row.id,
                 update: (el, row) => {
