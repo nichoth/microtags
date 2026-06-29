@@ -47,6 +47,9 @@ Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
     + [`renderList`](#renderlist)
     + [`render`](#render)
     + [Templates](#templates-1)
+  * [`microtags/util`](#microtagsutil)
+    + [Coercion](#coercion)
+    + [`runCleanups`](#runcleanups)
 - [Divergence from `nanotags`](#divergence-from-nanotags)
   * [Reactivity primitive](#reactivity-primitive)
   * [Effects + Subscriptions](#effects--subscriptions)
@@ -54,6 +57,7 @@ Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
   * [Context API](#context-api)
   * [Props](#props-1)
   * [Not ported](#not-ported)
+  * [Additions / New Features](#additions--new-features)
 
 <!-- tocstop -->
 
@@ -672,7 +676,8 @@ define('theme-provider')
         const theme = signal('light')
 
         // Share with descendants; remove the entry on disconnect.
-        ctx.onCleanup(provide(ctx.host, ThemeToken, theme()))
+        const cleanUp = provide(ctx.host, ThemeToken, theme())
+        ctx.onCleanup(cleanup)
 
         // Re-provide on change. provide() updates the existing signal,
         // so consumers that read this value re-run.
@@ -826,9 +831,79 @@ For a runnable version, see `example/render-demo.ts`. It keeps an editable
 re-renders on a timer and reorders on demand to show that focus, caret, and
 typed text survive: keyed nodes are reused and at most moved, never rebuilt.
 
-#### Templates
+---
 
+### `microtags/util`
 
+Helpers for reading raw attribute strings and running cleanup
+functions. `withProps` uses these internally to coerce attribute values.
+They are exported for when you need to read an attribute outside of the
+prop layer.
+
+```ts
+import {
+    coerceNumber,
+    coerceString,
+    coerceBoolean,
+    coerceJson,
+    runCleanups,
+} from 'microtags/util'
+```
+
+#### Coercion
+
+Each coercion helper takes the raw `getAttribute` result -- a `string` or
+`null` -- and returns a typed value. None of them throw.
+
+```ts
+function coerceNumber (raw:string | null):number
+function coerceString (raw:string | null):string
+function coerceBoolean (raw:string | null):boolean
+function coerceJson<T = unknown> (raw:string | null):T | undefined
+```
+
+- `coerceNumber` -- `Number(raw)`, or `NaN` when the attribute is absent
+  or cannot be parsed.
+- `coerceString` -- the value as-is; a missing attribute (`null`) becomes
+  the empty string `''`.
+- `coerceBoolean` -- presence-based, matching the HTML boolean-attribute
+  convention: absent (`null`) is `false`, present is `true`, including the
+  empty string from `disabled=""`.
+- `coerceJson` -- `JSON.parse(raw)`, or `undefined` when the attribute is
+  absent or not valid JSON. Pass a type parameter to annotate the result.
+
+#### `runCleanups`
+
+Runs every function in the array, even if some throw. After all have run
+it re-throws the first error encountered, so one failing teardown cannot
+skip the rest. A `Cleanup` is a no-argument teardown function, `() => void`.
+
+```ts
+function runCleanups (fns:Cleanup[]):void
+```
+
+#### `toAttributes`
+
+Transform an object into an HTML attributes string. The object should be
+like `{ attributeName: value }`. Handles boolean values by adding a string, eg
+`{ disabled: true }` = `<button disabled>`. Arrays are converted to a list in
+quotes, eg `{ class: ['abc', 'def'] }` = `<div class="abc def">`
+
+```ts
+type Attrs = Record<
+    string,
+    undefined|null|string|number|boolean|(string|number)[]
+>
+
+/**
+ * Transform an object into an HTML attributes string. The object should be
+ * like `{ attributeName: value }`.
+ *
+ * @param {Attrs} attrs An object for the attributes.
+ * @returns {string} A string suitable for use as HTML attributes.
+ */
+function toAttributes (attrs:Attrs):string
+```
 
 ---
 
@@ -850,7 +925,7 @@ all prop names are plain identifiers.
 
 ### Effects + Subscriptions
 
-The biggest difference. nanotags' `ctx.effect` takes the store(s) to watch
+In `nanotags`, `ctx.effect` takes the store(s) to watch
 explicitly and hands the value to the callback:
 
 ```ts
@@ -860,7 +935,7 @@ ctx.effect(ctx.props.$count, count => {
 })
 ```
 
-`microtags`'s `ctx.effect` takes a zero-argument function and tracks whichever
+In `microtags`, `ctx.effect` takes a zero-argument function and tracks whichever
 signals are read inside it (the `alien-signals` model):
 
 ```ts

@@ -9,7 +9,6 @@ import type {
     PropsSignals,
     Signal,
     SetupContext,
-    Cleanup,
     Coercer,
     ContextToken,
     RefDef,
@@ -97,7 +96,7 @@ export function factory<Props extends FactoryProps = FactoryProps> (
         static get observedAttributes () { return observedAttrNames }
 
         _props:Record<string, Signal<unknown>> = {}
-        _cleanups:Cleanup[] = []
+        _cleanups:(() => void)[] = []
 
         constructor () {
             super()

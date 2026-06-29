@@ -107,9 +107,6 @@ export type RefsMap<Defs extends Record<string, RefDef>> = {
         never
 }
 
-/** A teardown function registered via ctx.onCleanup or ctx.on. */
-export type Cleanup = () => void
-
 /** Options for ctx.bind. Omit `event` for a one-way binding. */
 export type BindOptions = { prop?:string; event?:string }
 
@@ -176,7 +173,7 @@ export interface SetupContext<
      * Run an alien-signals effect that auto-tracks the signals it reads.
      * The effect is auto-disposed on disconnect.
      */
-    effect(fn:() => void | Cleanup):void
+    effect(fn:() => void|(() => void)):void
 
     /**
      * Bind a signal to a DOM element. The signal is the source of
@@ -198,7 +195,7 @@ export interface SetupContext<
     ):void
 
     /** Register custom teardown to run on disconnect. */
-    onCleanup(fn:Cleanup):void
+    onCleanup(fn:() => void):void
 
     /** Read an optional context value. */
     consume<T>(token:ContextToken<T>):T | undefined

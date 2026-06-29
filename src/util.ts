@@ -1,5 +1,3 @@
-import type { Cleanup } from './types.js'
-
 /**
  * Coerce a raw attribute string to a number.
  * Returns NaN if the value cannot be parsed.
@@ -41,7 +39,7 @@ export function coerceJson<T = unknown> (raw:string | null):T | undefined {
  * Run every cleanup in the list, ensuring all run even if some throw.
  * After all have run, re-throws the first error encountered.
  */
-export function runCleanups (fns:Cleanup[]):void {
+export function runCleanups (fns:(() => void)[]):void {
     let firstError:unknown
     let caught = false
     for (const fn of fns) {
@@ -55,4 +53,31 @@ export function runCleanups (fns:Cleanup[]):void {
         }
     }
     if (caught) throw firstError
+}
+
+export type Attrs = Record<string, undefined|null|string|number|boolean|(string|number)[]>
+
+/**
+ * Transform an object into an HTML attributes string. The object should be
+ * like `{ attributeName: value }`.
+ *
+ * @param {Attrs} attrs An object for the attributes.
+ * @returns {string} A string suitable for use as HTML attributes.
+ */
+export function toAttributes (attrs:Attrs):string {
+    return Object.keys(attrs).reduce((acc, k) => {
+        const value = attrs[k]
+        if (!value) return acc
+
+        if (typeof value === 'boolean') {
+            if (value) return (acc + ` ${k}`).trim()
+            return acc
+        }
+
+        if (Array.isArray(value)) {
+            return (acc + ` ${k}="${value.join(' ')}"`)
+        }
+
+        return (acc + ` ${k}="${value}"`).trim()
+    }, '')
 }
