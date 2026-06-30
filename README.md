@@ -9,8 +9,8 @@
 [![gzip size](https://img.shields.io/bundlephobia/minzip/microtags?style=flat-square)](https://bundlephobia.com/package/microtags)
 [![license](https://img.shields.io/badge/license-Big_Time-blue?style=flat-square)](LICENSE)
 
-Web component helper with reactive props, automatic cleanup, and no
-[Shadow DOM](https://gomakethings.com/the-shadow-dom-is-an-antipattern/).
+Web component helper with reactive props, automatic cleanup, and
+[no Shadow DOM](https://gomakethings.com/the-shadow-dom-is-an-antipattern/).
 Reactive via [alien-signals](https://github.com/stackblitz/alien-signals).
 
 **Size: <!-- size -->3.47 KB<!-- /size -->** with all dependencies, minified and brotlied
@@ -26,6 +26,9 @@ Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
   * [Import map](#import-map)
   * [Pre-bundled](#pre-bundled)
 - [Example](#example)
+- [Validation](#validation)
+  * [Prop validation](#prop-validation)
+    + [How `p.schema` relates to Standard Schema](#how-pschema-relates-to-standard-schema)
   * [Client-side validation](#client-side-validation)
 - [Serverside Example](#serverside-example)
   * [`.TAG`](#tag)
@@ -52,7 +55,7 @@ Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
     + [Coercion](#coercion)
     + [`runAll`](#runall)
     + [`toAttributes`](#toattributes)
-- [Divergence from `nanotags`](#divergence-from-nanotags)
+- [Differences from `nanotags`](#differences-from-nanotags)
   * [Reactivity primitive](#reactivity-primitive)
   * [Effects + Subscriptions](#effects--subscriptions)
   * [Refs: `r.all` instead of `r.many`](#refs-rall-instead-of-rmany)
@@ -65,9 +68,7 @@ Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
 
 </details>
 
-----------------------------------------------------------------------
 ## Install
-----------------------------------------------------------------------
 
 ```sh
 npm i -S microtags
@@ -98,10 +99,8 @@ Subpaths follow the same URL pattern: `microtags/context`, `microtags/render`.
 
 ### Pre-bundled
 
-For raw-file CDNs (jsDelivr, unpkg) or local files, where dependencies are
-not resolved for you, use the pre-bundled `microtags/min` build. It is a
-single self-contained file with `alien-signals` inlined, so no other
-mappings are needed:
+This package exposes `microtags/min`, which is a single self-contained file
+with `alien-signals` inlined.
 
 ```html
 <script type="importmap">
@@ -114,22 +113,27 @@ mappings are needed:
 ```
 
 
-----------------------------------------------------------------------
 ## Example
-----------------------------------------------------------------------
 
-This example depends on having the full HTML already in the DOM. If you want
-to do client-side-rendered components, that is possible. You would update the
-DOM inside `.setup`.
+This example depends on the full HTML already being in the DOM.
+Defining the components on the client-side is about "hydrating" the page, or
+adding behavior.
 
-Since the full HTML exists already, defining your components in the
-client-side JS is about "hydrating" the page (adding behavior).
+If you want to client-side render the components, that is possible too.
+You can update the DOM inside `.setup`.
+
+
+>
+> [!NOTE]  
+> The server should know how to create the markup that components depend
+> on here. See [the serverside example](#serverside-example).
+>
 
 ---
 
-`withProps`, `withRefs`, and `withContexts` are optional and can appear in
-any order. `.setup` ends the chain: it calls `customElements.define` under the
-hood and returns a typed constructor.
+Methods `withProps`, `withRefs`, and `withContexts` are optional and can appear
+in any order. `.setup` ends the chain. It calls `customElements.define` under
+the hood and returns a typed constructor.
 
 ```ts
 import { define } from 'microtags'
@@ -186,25 +190,98 @@ export const myCounter = define('my-counter')
 </my-counter>
 ```
 
-### Client-side validation
-
-See [example/subscribe-form.ts](./example/subscribe-form.ts).
+## Validation
 
 There are two separate things people call "validation", and `microtags`
 handles them in different places:
 
-1. **Prop validation** checks the attributes passed *into* a component.
+1. **Prop validation** checks the attributes passed into a component.
    Pass a [Standard Schema](https://standardschema.dev) (Zod, Valibot,
    ArkType) to [`p.schema`](#withprops); it coerces the attribute value
-   and falls back to `undefined` when the value doesn't match.
-2. **Form input validation** checks live user input in a form, for example a
-   value that changes on every keystroke and needs to report *why* it is invalid.
+   and falls back to `undefined` when the value doesn't coerce.
+2. **Form input validation** client-side validation -- checks live user input
+   in a form, for example a value that changes on every keystroke.
    There is no dedicated API for this. Validate the schema directly
-   inside `.setup()` and hold the result in a signal:
+   inside `.setup()` and hold the result as a signal.
 
-The example below is the second kind -- form input (client-side) validation.
+### Prop validation
+
+Pass a [Standard Schema](https://standardschema.dev) validator to `p.schema`.
+The validator runs against the raw attribute and its output becomes the
+signal's value; anything it rejects falls back to `undefined`.
 
 ```ts
+import { z } from 'zod'
+import { define } from 'microtags'
+
+// Any Standard Schema validator works (Zod, Valibot, ArkType). microtags
+// only sees the shared `~standard` interface, so it has no validation
+// library of its own and no dependency on the one you pick.
+const Variant = z.enum(['info', 'success', 'warning', 'danger'])
+
+define('status-badge')
+    .withProps(p => ({
+        // Validates the raw `variant` attribute. A value outside the
+        // four options falls back to `undefined`.
+        variant: p.schema(Variant),
+    }))
+    .setup(ctx => {
+        ctx.effect(() => {
+            const variant = ctx.props.variant() ?? 'info'
+            ctx.host.className = `badge badge-${variant}`
+        })
+    })
+```
+
+```html
+<status-badge variant="success">Saved</status-badge>
+
+<!-- "purple" is not in the enum, so ctx.props.variant() is undefined -->
+<status-badge variant="purple">Unknown</status-badge>
+```
+
+#### How `p.schema` relates to Standard Schema
+
+[Standard Schema](https://standardschema.dev) is a small shared interface
+that Zod, Valibot and ArkType all implement. `p.schema` validates through that
+interface, so microtags ships no validator of its own.
+
+A schema prop is attribute-backed and observed, exactly like `p.string()` or
+`p.number()`: editing the attribute re-runs the validator and pushes the result
+to `ctx.props`.
+
+The validator's input is the raw attribute string, or `null` when the attribute
+is absent. Because the input is always a string, schemas for non-string values
+must coerce. Use `z.coerce.number()`, not `z.number()`:
+
+```ts
+.withProps(p => ({
+    // "5" -> 5; "0" and the absent attribute both fall back to undefined
+    quantity: p.schema(z.coerce.number().int().min(1)),
+}))
+```
+
+On success the signal holds the validator's output value; on failure it falls
+back to `undefined`. The inferred signal type is the schema's output, so guard
+for the `undefined` case, or fold a default into the schema so it never fails:
+
+```ts
+// always 'info' | 'success' | 'warning' | 'danger', never undefined
+variant: p.schema(Variant.catch('info')),
+```
+
+Only synchronous schemas are supported; an async schema throws when the
+attribute is validated.
+
+
+### Client-side validation
+
+There is no special API here. Validate input inside `.setup`, 
+
+See [example/subscribe-form.ts](./example/subscribe-form.ts).
+
+```ts
+// form input (client-side) validation
 import { signal, startBatch, endBatch } from 'alien-signals'
 import { z } from 'zod'
 import { define } from 'microtags'
@@ -221,18 +298,21 @@ define('subscribe-form')
     }))
     .setup(ctx => {
         const value = signal('')
-        const touched = signal(false)
+        const touched = signal<boolean>(false)
 
         // capture the live value (two-way; clears the field on reset)
         ctx.bind(value, ctx.refs.input)
+
         // only reveal errors after the first blur
         ctx.on(ctx.refs.input, 'blur', () => touched(true))
 
+        // ctx.effect is alien-signals/effect with automatic/correct disposal
         ctx.effect(() => {
+            // subscribe to `value` and `touched`
             const result = Email.safeParse(value())
-            const message = result.success ?
+            const message = (result.success ?
                 '' :
-                result.error.issues[0].message
+                result.error.issues[0].message)
             const showError = touched() && !result.success
 
             ctx.refs.submit.disabled = !result.success
@@ -241,6 +321,7 @@ define('subscribe-form')
         })
 
         ctx.on(ctx.refs.form, 'submit', ev => {
+            // subscribe to DOM events
             ev.preventDefault()
             if (!Email.safeParse(value()).success) return
             ctx.refs.status.textContent = 'Thanks for subscribing!'
@@ -257,9 +338,7 @@ the submit button is gated on validity. See `example/subscribe-form.ts`
 for the full working component.
 
 
-----------------------------------------------------------------------
 ## Serverside Example
-----------------------------------------------------------------------
 
 ### `.TAG`
 
@@ -313,9 +392,7 @@ export function render ():string {
 }
 ```
 
-----------------------------------------------------------------------
 ## API
-----------------------------------------------------------------------
 
 ### Props
 
@@ -444,15 +521,6 @@ get a more specific element type:
 }))
 ```
 
-These flow straight through to `ctx.refs`:
-
-```ts
-ctx.refs.display  // HTMLDivElement
-ctx.refs.save     // HTMLButtonElement
-ctx.refs.items    // HTMLLIElement[]
-ctx.refs.button   // HTMLElement (the un-annotated default)
-```
-
 Non-HTML refs (SVG / MathML) are out of scope: the type parameter is
 constrained to `HTMLElement`, so cast at the use site if you need one
 (e.g. `ctx.refs.icon as unknown as SVGSVGElement`).
@@ -529,15 +597,24 @@ All builder methods are chainable and fully type-inferred.
 
 Context is for the case where a parent component defines some state, e.g. a
 `theme`, and the top-level (application) knows nothing about the theme, but the
-application does determine what children the parent renders
+application *does* determine what children the parent renders
 (the app passes in children), and the children need to know the theme.
+
+
+```html
+<!-- The application composes this markup. -->
+<theme-provider>
+    <some-child></some-child>
+    <another-child></another-child>
+</theme-provider>
+```
 
 In that case, there is no way for the "parent" component to pass the theme to
 the children. The root level (application) doesn't know what the theme is.
 
 Context gives us a way to model this. The context-provider
 publishes the value, and any descendants opt in with
-`withContexts`, and the unknown-consumer and late-arrival problems are handled. 
+`withContexts`.
 
 >
 > [!IMPORTANT]  
@@ -574,8 +651,6 @@ define('themed-card')
 ```
 
 ```html
-<!-- The application writes this markup. It nests <themed-card> inside
-     <theme-provider> but never sets the theme itself. -->
 <theme-provider>
     <themed-card>Card content</themed-card>
 </theme-provider>
@@ -996,7 +1071,7 @@ function toAttributes (attrs:Attrs):string
 
 ---
 
-## Divergence from `nanotags`
+## Differences from `nanotags`
 
 ### Reactivity primitive
 
