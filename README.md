@@ -36,6 +36,7 @@ Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
   * [Refs](#refs)
     + [`withRefs`](#withrefs)
     + [Element types](#element-types)
+    + [Missing refs](#missing-refs)
   * [`define`](#define)
   * [`withContexts`](#withcontexts)
   * [`setup` and `ctx`](#setup-and-ctx)
@@ -456,6 +457,62 @@ Non-HTML refs (SVG / MathML) are out of scope: the type parameter is
 constrained to `HTMLElement`, so cast at the use site if you need one
 (e.g. `ctx.refs.icon as unknown as SVGSVGElement`).
 
+---
+
+#### Missing refs
+
+Any calls to `r.one` in `.withRefs` will throw.
+
+```
+Error: MY-COMPONENT: missing refs: button, save
+```
+
+The tag name is upper case (it comes from `host.tagName`), and the
+message lists every required ref that was not found.
+
+Call to `r.all()` are **never reported here**. A missing match resolves to an
+empty array, not an error.
+
+This check happens right before the custom element runs your `.setup` function.
+
+For a component with no contexts, refs are resolved at the moment the element
+connects to the DOM. For a component that declares
+[`withContexts`](#withcontexts), ref collection is deferred along
+with `setup` until every required context resolves.
+
+
+##### Checking refs in tests
+
+A missing `r.one` ref throws while the component connects. When the browser
+runs a lifecycle callback (which is what `appendChild` triggers), it reports
+the exception to the global `error` event rather than propagating it to the
+caller, so a try / catch around `appendChild` sees nothing.
+
+You need to listen for the global `error` event. When every
+`data-ref` the component declares is present, nothing is reported.
+
+```ts
+import { test } from '@substrate-system/tapzero'
+import './my-counter.js'  // the component from the example above
+
+test('all refs resolve', t => {
+    let err:Error|null = null
+    const onError = (ev:ErrorEvent) => { err = ev.error }
+    window.addEventListener('error', onError)
+
+    const el = document.createElement('my-counter')
+    el.innerHTML = `
+        <div data-ref="display"></div>
+        <button data-ref="dec">-</button>
+        <button data-ref="inc">+</button>`
+    document.body.appendChild(el)
+
+    t.ok(err === null, 'no missing refs')
+
+    window.removeEventListener('error', onError)
+    document.body.removeChild(el)
+})
+```
 
 ### `define`
 

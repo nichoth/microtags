@@ -52,8 +52,8 @@ export interface FactoryConfig<Props extends FactoryProps = FactoryProps> {
 function collectRefs (
     host:HTMLElement,
     defs:Record<string, RefDef>
-):Record<string, Element | Element[]> {
-    const result:Record<string, Element | Element[]> = {}
+):Record<string, Element|Element[]> {
+    const result:Record<string, Element|Element[]> = {}
     const missing:string[] = []
     for (const [key, def] of Object.entries(defs)) {
         const sel = def.selector ?? `[data-ref="${key}"]`
@@ -183,8 +183,8 @@ export function factory<Props extends FactoryProps = FactoryProps> (
 
         attributeChangedCallback (
             name:string,
-            _old:string | null,
-            next:string | null
+            _old:string|null,
+            next:string|null
         ) {
             const coercer = propDefs[name]
             if (coercer !== undefined && this._props[name] !== undefined) {
