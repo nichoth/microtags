@@ -36,6 +36,7 @@ Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
   * [Client-side validation](#client-side-validation)
 - [Serverside Example](#serverside-example)
   * [`.TAG`](#tag)
+  * [`.refs`](#refs)
 - [API](#api)
   * [`define`](#define)
     + [`ComponentBuilder`](#componentbuilder)
