@@ -13,7 +13,7 @@ Web component helper with reactive props, automatic cleanup, and
 [no Shadow DOM](https://gomakethings.com/the-shadow-dom-is-an-antipattern/).
 Reactive via [alien-signals](https://github.com/stackblitz/alien-signals).
 
-**Size: <!-- size -->3.47 KB<!-- /size -->** with all dependencies, minified and brotlied
+**Size: <!-- size -->3.48 KB<!-- /size -->** with all dependencies, minified and brotlied
 
 Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
 **alien-signals** instead of nanostores atoms.
