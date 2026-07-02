@@ -466,6 +466,25 @@ export function render ():string {
 }
 ```
 
+### `.refs`
+
+Web components created with `microtags` have a property `.refs` that is an
+object of the ref names you created the coponent with. Use it to create
+`data-ref` attributes.
+
+```ts
+import { MyCounter } from '../example.js'
+
+export function render () {
+    return `
+        <div
+            data-ref="${MyCounter.refs.display}"
+            role="status"
+            class="count"
+        >${START}</div>
+    `
+}
+```
 
 ---------------------------------------------------------------------
 

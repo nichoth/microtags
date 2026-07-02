@@ -84,7 +84,7 @@ const contextDSL:ContextDSL = {}
  * Maps each declared ref key to its own name as a string literal. Exposed
  * as the static `refs` on a registered element so server-rendered templates
  * can fill in `data-ref` values without hardcoding the names, e.g.
- * `data-ref="${myCounter.refs.dec}"`.
+ * `data-ref="${MyCounter.refs.dec}"`.
  */
 export type RefNames<RefDefs extends Record<string, RefDef>> = {
     readonly [K in keyof RefDefs]:K & string
@@ -103,7 +103,7 @@ export type MicrotagElementClass<
     /**
      * The declared ref names, each mapping to its own `data-ref` string.
      * Lets server-rendered markup reference refs by key instead of a magic
-     * string: `myCounter.refs.dec`.
+     * string: `MyCounter.refs.dec`.
      */
     readonly refs:RefNames<RefDefs>
 }

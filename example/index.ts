@@ -13,7 +13,7 @@ import './theme-toggle.js'
  *  - data-ref elements (the <count-button> and <copy-btn> children)
  *  - ctx.effect, ctx.on
  */
-export const myCounter = define('my-counter')
+export const MyCounter = define('my-counter')
     .withProps(p => ({
         start: p.number(),  // the starting count (an attribute)
     }))

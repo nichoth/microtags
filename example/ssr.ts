@@ -1,4 +1,4 @@
-import { myCounter } from './index.js'
+import { MyCounter } from './index.js'
 import { CopyBtn } from './copy-button.js'
 import { CountBtn } from './count-button.js'
 import { SubscribeForm } from './subscribe-form.js'
@@ -16,8 +16,8 @@ const START = 5
 
 function renderCounter ():string {
     return `
-        <${myCounter.TAG} start="${START}">
-            <div data-ref="${myCounter.refs.display}"
+        <${MyCounter.TAG} start="${START}">
+            <div data-ref="${MyCounter.refs.display}"
                 role="status"
                 class="count"
             >${START}</div>
@@ -25,7 +25,7 @@ function renderCounter ():string {
             <div class="controls">
                 <${CountBtn.TAG}
                     class="dec"
-                    data-ref="${myCounter.refs.dec}"
+                    data-ref="${MyCounter.refs.dec}"
                     aria-label="Decrement"
                 >
                     <button>-</button>
@@ -33,20 +33,20 @@ function renderCounter ():string {
 
                 <${CopyBtn.TAG}
                     class="copy"
-                    data-ref="${myCounter.refs.copy}"
+                    data-ref="${MyCounter.refs.copy}"
                 >
                     <button>Copy</button>
                 </${CopyBtn.TAG}>
 
                 <${CountBtn.TAG}
                     class="inc"
-                    data-ref="${myCounter.refs.inc}"
+                    data-ref="${MyCounter.refs.inc}"
                     aria-label="Increment"
                 >
                     <button>+</button>
                 </${CountBtn.TAG}>
             </div>
-        </${myCounter.TAG}>`
+        </${MyCounter.TAG}>`
 }
 
 function renderSubscribeForm ():string {
