@@ -25,26 +25,31 @@ Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
 - [Install](#install)
   * [Import map](#import-map)
   * [Pre-bundled](#pre-bundled)
-- [Example](#example)
+- [Get Started](#get-started)
+  * [1. Call `.define`](#1-call-define)
+  * [2. Call the `.with*` Methods](#2-call-the-with-methods)
+  * [3. Call `.setup`](#3-call-setup)
+- [Full Example](#full-example)
 - [Validation](#validation)
   * [Prop validation](#prop-validation)
-    + [How `p.schema` relates to Standard Schema](#how-pschema-relates-to-standard-schema)
+    + [`p.schema` vs Standard Schema](#pschema-vs-standard-schema)
   * [Client-side validation](#client-side-validation)
 - [Serverside Example](#serverside-example)
   * [`.TAG`](#tag)
-  * [`.refs`](#refs)
 - [API](#api)
-  * [Props](#props)
-    + [`withProps`](#withprops)
-  * [Refs](#refs)
-    + [`withRefs`](#withrefs)
-    + [Element types](#element-types)
-    + [Missing refs](#missing-refs)
   * [`define`](#define)
-  * [`withContexts`](#withcontexts)
-  * [`setup` and `ctx`](#setup-and-ctx)
-    + [peek and untracked](#peek-and-untracked)
-  * [Typed Events](#typed-events)
+    + [`ComponentBuilder`](#componentbuilder)
+  * [`builder.withProps`](#builderwithprops)
+    + [`p.json`](#pjson)
+    + [`p.schema`](#pschema)
+  * [`builder.withRefs(fn)`](#builderwithrefsfn)
+  * [`builder.withContexts`](#builderwithcontexts)
+    + [`.withContexts` Example](#withcontexts-example)
+  * [`builder.setup(ctx)`](#buildersetupctx)
+    + [`ctx`](#ctx)
+- [Missing refs](#missing-refs)
+  * [Checking refs in tests](#checking-refs-in-tests)
+- [Typed Events](#typed-events)
 - [Templates](#templates)
 - [Subpath Exports](#subpath-exports)
   * [`microtags/context`](#microtagscontext)
@@ -60,7 +65,7 @@ Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
   * [Effects + Subscriptions](#effects--subscriptions)
   * [Refs: `r.all` instead of `r.many`](#refs-rall-instead-of-rmany)
   * [Context API](#context-api)
-  * [Props](#props-1)
+  * [Props](#props)
   * [Not ported](#not-ported)
   * [Additions / New Features](#additions--new-features)
 
@@ -112,16 +117,82 @@ with `alien-signals` inlined.
 </script>
 ```
 
+## Get Started
 
-## Example
+### 1. Call `.define`
 
-This example depends on the full HTML already being in the DOM.
-Defining the components on the client-side is about "hydrating" the page, or
-adding behavior.
+```ts
+import { define } from 'microtags'
+
+const myCounter = define('my-counter')
+```
+
+---
+
+### 2. Call the `.with*` Methods
+
+Methods `withProps`, `withRefs`, and `withContexts` are optional and can appear
+in any order. `.setup` ends the chain. It calls `customElements.define` under
+the hood and returns a typed constructor.
+
+```ts
+myCounter
+    .withProps(p => ({
+        start: p.number(),  // the starting count (an attribute)
+    }))
+    .withRefs(r => ({  // keys in this object are the `data-ref` names in HTML
+        display: r.one<HTMLDivElement>(),  // typed as HTMLDivElement,
+        inc: r.one(),  // depends on a child in HTML with `data-ref="inc"`
+        dec: r.one(),  // depends on a child in HTML with `data-ref="dec"`
+        copy: r.one(),  // the <copy-btn> element, via `data-ref="copy"`
+    }))
+```
+
+### 3. Call `.setup`
+
+Method `.setup` takes a function that gets called with `context` object.
+
+```ts
+myCounter
+    .setup(ctx => {
+        const count = signal(ctx.props.start())
+        // `ctx.refs` are expected to be HTML elements with a matching `data-ref`
+        const display = ctx.refs.display
+
+        // whenever `count` changes
+        ctx.effect(() => {
+            display.textContent = `Count: ${count()}`
+            display.style.color = count() < 0 ? 'red' : 'inherit'
+        })
+
+        // Reflect the live count onto the copy button's `value` attribute.
+        // Because `value` is attribute-backed, this flows into <copy-btn>'s
+        // own signal, so it always copies the current count.
+        ctx.effect(() => {
+            const copy = ctx.refs.copy
+            copy.setAttribute('value', String(count()))
+        })
+
+        /**
+         * Listen for clicks.
+         */
+        ctx.on(ctx.refs.inc, 'click', () => {
+            count(count() + 1)
+        })
+
+        ctx.on(ctx.refs.dec, 'click', () => {
+            count(count() - 1)
+        })
+    })
+```
+
+## Full Example
+
+This example expects the full HTML to already be in the DOM.
+Defining the components is about "hydrating" the page, or adding behavior.
 
 If you want to client-side render the components, that is possible too.
 You can update the DOM inside `.setup`.
-
 
 >
 > [!NOTE]  
@@ -129,11 +200,6 @@ You can update the DOM inside `.setup`.
 > on here. See [the serverside example](#serverside-example).
 >
 
----
-
-Methods `withProps`, `withRefs`, and `withContexts` are optional and can appear
-in any order. `.setup` ends the chain. It calls `customElements.define` under
-the hood and returns a typed constructor.
 
 ```ts
 import { define } from 'microtags'
@@ -141,7 +207,7 @@ import { signal } from 'alien-signals'
 
 /**
  *  - attribute-backed prop (`start`)
- *  - data-ref elements (the <count-button> and <copy-btn> children)
+ *  - data-ref elements -- each needs a data-ref attribute, eg data-ref="inc"
  *  - ctx.effect, ctx.on
  */
 export const myCounter = define('my-counter')
@@ -192,14 +258,13 @@ export const myCounter = define('my-counter')
 
 ## Validation
 
-There are two separate things people call "validation", and `microtags`
-handles them in different places:
+There are two separate things people call "validation":
 
 1. **Prop validation** checks the attributes passed into a component.
    Pass a [Standard Schema](https://standardschema.dev) (Zod, Valibot,
    ArkType) to [`p.schema`](#withprops); it coerces the attribute value
    and falls back to `undefined` when the value doesn't coerce.
-2. **Form input validation** client-side validation -- checks live user input
+2. **Form input validation** -- client-side validation -- checks live user input
    in a form, for example a value that changes on every keystroke.
    There is no dedicated API for this. Validate the schema directly
    inside `.setup()` and hold the result as a signal.
@@ -240,7 +305,7 @@ define('status-badge')
 <status-badge variant="purple">Unknown</status-badge>
 ```
 
-#### How `p.schema` relates to Standard Schema
+#### `p.schema` vs Standard Schema
 
 [Standard Schema](https://standardschema.dev) is a small shared interface
 that Zod, Valibot and ArkType all implement. `p.schema` validates through that
@@ -261,18 +326,23 @@ must coerce. Use `z.coerce.number()`, not `z.number()`:
 }))
 ```
 
-On success the signal holds the validator's output value; on failure it falls
-back to `undefined`. The inferred signal type is the schema's output, so guard
-for the `undefined` case, or fold a default into the schema so it never fails:
+**On success the signal holds the validator's output value**; on failure it
+falls back to `undefined`. The inferred signal type is the schema's output,
+so guard for the `undefined` case, or fold a default into the schema so it
+never fails:
+
 
 ```ts
-// always 'info' | 'success' | 'warning' | 'danger', never undefined
-variant: p.schema(Variant.catch('info')),
+{
+    // always 'info' | 'success' | 'warning' | 'danger', never undefined
+    variant: p.schema(Variant.catch('info')),
+}
 ```
 
 Only synchronous schemas are supported; an async schema throws when the
 attribute is validated.
 
+-------------------------------------------------------
 
 ### Client-side validation
 
@@ -333,12 +403,16 @@ define('subscribe-form')
     })
 ```
 
-The error stays hidden until the field is blurred once, then updates live;
-the submit button is gated on validity. See `example/subscribe-form.ts`
-for the full working component.
+The error stays hidden until the field is blurred once, then updates live,
+and the submit button is disabled until valid. See `example/subscribe-form.ts`.
+
+
+---------------------------------------------------------------
 
 
 ## Serverside Example
+
+See [./example/ssr.ts](./example/ssr.ts).
 
 ### `.TAG`
 
@@ -346,11 +420,11 @@ Each tag name that you pass to `define` is exposed as a property `.TAG`
 on the return value. It is possible to import your web components in Node,
 even though Node does not have browser APIs.
 
-### `.refs`
+The `data-ref` attribute is a fallback. It's used when you don't pass a
+selector to `r.one()`. If you pass explicit CSS selectors to `withRefs`,
+e.g. `{ copy: r.one('button') }`, then the HTML does not require a `data-ref`
+attribute.
 
-All refs are defined per-component, and the ref names are exposed at `.refs`,
-so you can import your web components on the server and read the ref names
-as strings.
 
 ```ts
 import { MyCounter, CountBtn, CopyBtn } from './index.js'
@@ -392,9 +466,39 @@ export function render ():string {
 }
 ```
 
+
+---------------------------------------------------------------------
+
+
 ## API
 
-### Props
+### `define`
+
+```js
+function define (tagName:string):ComponentBuilder
+```
+
+Function `define(tagName)` returns a [`ComponentBuilder`](#componentbuilder).
+
+
+#### `ComponentBuilder`
+
+The object returned by [`define`](#define). Includes methods:
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `.TAG` | `string` | The tag name passed to `define`. See [`.TAG`](#tag). |
+| `.withProps(fn)` | `ComponentBuilder` | Declare reactive attributes. See [Props](#props). |
+| `.withRefs(fn)` | `ComponentBuilder` | Declare DOM refs resolved once the element connects. See [Refs](#refs-1). |
+| `.withContexts(fn)` | `ComponentBuilder` | Consume context values published by an ancestor. See [`withContexts`](#withcontexts). |
+| `.setup(fn)` | `MicrotagElementClass` | Registers the custom element and returns its class. See [`setup`](#setup) below. |
+
+Methods `withProps`, `withRefs`, and `withContexts` each return a new builder,
+so they chain in any order; `setup` ends the chain by registering the element.
+
+---------------------------------------------------------
+
+### `builder.withProps`
 
 Declare reactive attributes via `withProps`. Each prop becomes:
 
@@ -410,8 +514,6 @@ Declare reactive attributes via `withProps`. Each prop becomes:
 | `p.boolean()` | `"true"` / `""` &rarr; `true`, `"false"` &rarr; `false` | `false` |
 | `p.oneOf(opts)` | Picklist enum, throws on invalid | throws |
 
-#### `withProps`
-
 ```ts
 .withProps(p => ({
     count:   p.number(),           // attribute -> number  (NaN when absent)
@@ -423,7 +525,15 @@ Declare reactive attributes via `withProps`. Each prop becomes:
 }))
 ```
 
-##### `p.json`
+Inside `.setup()`, every prop is a callable signal:
+
+```ts
+ctx.props.count()      // read
+ctx.props.count(42)    // write
+```
+
+
+#### `p.json`
 
 `p.json<T>()` -- a prop whose attribute value is parsed with
 `JSON.parse`. The type parameter `T` annotates the parsed result; it is a
@@ -446,6 +556,7 @@ observed, so editing the attribute re-parses and pushes the new value to
 attribute is absent, and when the value is not valid JSON. Parse errors are
 swallowed rather than thrown.
 
+
 ```ts
 // check for `undefined` case
 ctx.effect(() => {
@@ -455,31 +566,45 @@ ctx.effect(() => {
 })
 ```
 
+#### `p.schema`
+
 For input you want validated rather than only parsed, pass a Standard Schema
 to [`p.schema`](#withprops) instead.
 
-Inside `setup()`, every prop is a callable signal:
+
+---------------------------------------------------------
+
+
+### `builder.withRefs(fn)`
+
+Takes a function that gets called with a helpful query selector, `r`.
+
+Call `r.one()` / `r.all()` with no argument to match `[data-ref="<key>"]`,
+where `key` is the key name you passed in. Or pass a CSS selector to query by
+it instead. Queries are resolved relative to the host element, during
+[the `connectedCallback`](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_custom_elements#custom_element_lifecycle_callbacks).
+
+All refs returned from this callback are typed as much as possible, and exposed
+on the `context` object passed to the `.setup` function.
+
 
 ```ts
-ctx.props.count()      // read
-ctx.props.count(42)    // write
+class ComponentBuilder {
+    withRefs<R extends Record<string, RefDef>> (
+        fn:(r:RefsDSL) => R
+    ):ComponentBuilder<Props, R, CtxDefs>
+}
 ```
 
----
 
-### Refs
+Takes a function that gets called with a [`RefsDSL`](./src/builders.ts#L54)
+object. It should return an object of child elements that you want to keep
+references to.
 
 The `data-ref` attribute is a fallback. It's used when you don't pass a
 selector to `r.one()`. If you pass explicit CSS selectors to `withRefs`,
 e.g. `{ copy: r.one('button') }`, then the HTML does not require a `data-ref`
 attribute.
-
-#### `withRefs`
-
-Call `r.one()` / `r.all()` with no argument to match `[data-ref="<key>"]`,
-where `key` is the key name you pass in, or pass a CSS selector to query by
-it instead. Queries are resolved relative to the host element, during
-[the `connectedCallback`](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_custom_elements#custom_element_lifecycle_callbacks).
 
 
 ```ts
@@ -498,108 +623,26 @@ If there are no `data-ref` attribtues in the HTML, use CSS query selectors.
 }))
 ```
 
-See [#refs in serverside-rendering](#refs). Each component created with
-`micortags` exposes a `.refs` property that is an object map
-of ref names, eg `MyComponent.refs.copyButton`.
 
-#### Element types
-
-An un-annotated `r.one()` is typed as `HTMLElement`, so `.style`,
-`.textContent`, and `.dataset` work without a cast. There are two ways to
-get a more specific element type:
-
-```ts
-.withRefs(r => ({
-    // Generic argument: sets the type, keeps the [data-ref] selector.
-    display: r.one<HTMLDivElement>(),
-
-    // Tag string: infers the type AND queries by that tag, exactly like
-    // document.querySelector('button'). It does NOT keep [data-ref].
-    save:    r.one('button'),     // SingleRefDef<HTMLButtonElement>
-    items:   r.all('li'),         // MultipleRefDef<HTMLLIElement>
-    button:  r.one(),             // HTMLElement (un-annotated default)
-}))
-```
-
-Non-HTML refs (SVG / MathML) are out of scope: the type parameter is
-constrained to `HTMLElement`, so cast at the use site if you need one
-(e.g. `ctx.refs.icon as unknown as SVGSVGElement`).
-
----
-
-#### Missing refs
-
-Any calls to `r.one` in `.withRefs` will throw.
-
-```
-Error: MY-COMPONENT: missing refs: button, save
-```
-
-The tag name is upper case (it comes from `host.tagName`), and the
-message lists every required ref that was not found.
-
-Call to `r.all()` are **never reported here**. A missing match resolves to an
-empty array, not an error.
-
-This check happens right before the custom element runs your `.setup` function.
-
-For a component with no contexts, refs are resolved at the moment the element
-connects to the DOM. For a component that declares
-[`withContexts`](#withcontexts), ref collection is deferred along
-with `setup` until every required context resolves.
+---------------------------------------------------------------------
 
 
-##### Checking refs in tests
-
-A missing `r.one` ref throws while the component connects. When the browser
-runs a lifecycle callback (which is what `appendChild` triggers), it reports
-the exception to the global `error` event rather than propagating it to the
-caller, so a try / catch around `appendChild` sees nothing.
-
-You need to listen for the global `error` event. When every
-`data-ref` the component declares is present, nothing is reported.
-
-```ts
-import { test } from '@substrate-system/tapzero'
-import './my-counter.js'  // the component from the example above
-
-test('all refs resolve', t => {
-    let err:Error|null = null
-    const onError = (ev:ErrorEvent) => { err = ev.error }
-    window.addEventListener('error', onError)
-
-    const el = document.createElement('my-counter')
-    el.innerHTML = `
-        <div data-ref="display"></div>
-        <button data-ref="dec">-</button>
-        <button data-ref="inc">+</button>`
-    document.body.appendChild(el)
-
-    t.ok(err === null, 'no missing refs')
-
-    window.removeEventListener('error', onError)
-    document.body.removeChild(el)
-})
-```
-
-### `define`
-
-```ts
-import { define } from 'microtags'
-
-define(tagName:string):ComponentBuilder
-```
-
-Returns a fluent builder. Call `.setup()` to register the custom element.
-All builder methods are chainable and fully type-inferred.
-
-### `withContexts`
+### `builder.withContexts`
 
 Context is for the case where a parent component defines some state, e.g. a
 `theme`, and the top-level (application) knows nothing about the theme, but the
 application *does* determine what children the parent renders
 (the app passes in children), and the children need to know the theme.
 
+```ts
+class ComponentBuilder {
+    withContexts<C extends Record<string, ContextToken<unknown>>> (
+        fn:(c:ContextDSL) => C
+    ):ComponentBuilder<Props, RefDefs, C>
+}
+```
+
+#### `.withContexts` Example
 
 ```html
 <!-- The application composes this markup. -->
@@ -621,7 +664,6 @@ publishes the value, and any descendants opt in with
 > Context is only relevant on the client-side.
 > Context gives you nothing for first paint or the no-JS case.
 >
-
 
 ```ts
 import { define } from 'microtags'
@@ -656,64 +698,152 @@ define('themed-card')
 </theme-provider>
 ```
 
-`setup()` is deferred until all required contexts resolve. See
-[`microtags/context`](#microtagscontext) for the provider API.
+
+---------------------------------------------------------
+
+
+### `builder.setup(ctx)`
+
+Registers the custom element via `customElements.define` and returns the
+element class. The returned class exposes `.TAG` and `.refs` as static
+members, for use in [serverside rendering](#serverside-example).
+
+```ts
+class ComponentBuilder {
+    setup (
+        fn:(ctx:SetupContext<
+            Props,
+            RefsMap<RefDefs>,
+            ContextsMap<CtxDefs>
+        >) => void
+    ):MicrotagElementClass<RefDefs> {
+}
+```
+
+The callback function runs once per element instance, and is called with the
+following `context` object.
+
+
+#### `ctx`
+
+The argument passed to the callback given to `setup`.
+
+```ts
+ctx:SetupContext<Props, RefsMap<RefDefs>, ContextsMap<CtxDefs>>
+```
+
+##### `ctx` Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `.peek(signal)` | `T` | Read a signal's current value without subscribing, even inside `ctx.effect`. |
+| `.on(target, type, handler, options?)` | `void` | Add a DOM event listener, auto-removed on disconnect. |
+| `.emit(event)` / `.emit(name, detail?, options?)` | `boolean` | Dispatch a pre-built `Event` as-is, or construct and dispatch a bubbling `CustomEvent` from a name. Returns `dispatchEvent`'s result: `false` if a cancelable event had `preventDefault()` called. |
+| `.effect(fn)` | `void` | Run an alien-signals effect that auto-tracks the signals it reads. Auto-disposed on disconnect. |
+| `.bind(signal, element, options?)` | `void` | Bind a signal to a DOM element property, auto-cleaned on disconnect. |
+| `.onCleanup(fn)` | `void` | Register custom teardown to run on disconnect. |
+| `.consume(token)` | `T \| undefined` | Read an optional context value published by an ancestor. See [`withContexts`](#withcontexts). |
+
+See [Typed Events](#typed-events) for more about `.on` and `.emit`.
+
+##### `ctx.bind`
+
+The `.bind` method treats the signal as the source of truth. The element
+property is set from the signal.
+With no `options`, the control's element property and write-back event are
+auto-detected from its type:
+
+```ts
+{
+    bind<T> (
+        source:Signal<T>,
+        control:Element,
+        opts?:BindOptions
+    )
+}
+```
+
+| Control | `prop` | write-back `event` |
+|---------|--------|---------------------|
+| `<input type="checkbox">` | `checked` | `change` |
+| `<input type="number">` / `type="range"` | `valueAsNumber` | `input` |
+| Other `<input>` types / `<textarea>` | `value` | `input` |
+| Anything else, e.g. `<select>` | `value` | `change` |
+
+Passing `options` overrides the auto-detected `prop`, and replaces the
+write-back `event` -- omit `options.event` for a one-way binding. A read-only
+getter (`() => T`) is also accepted as the `signal` argument, for binding a
+derived value one-way (pass it with `options` and omit `event`).
+
+```ts
+// two-way, auto-detected (checkbox -> `checked` / `change`)
+ctx.bind(checked, ctx.refs.toggle)
+
+// one-way: push a derived value into a read-only display
+ctx.bind(() => `${count()} items`, ctx.refs.label, { prop: 'textContent' })
+```
 
 ---
 
-### `setup` and `ctx`
+
+## Missing refs
+
+Any calls to `r.one` in `.withRefs` will throw if there is not a matching
+child element.
+
+```
+Error: MY-COMPONENT: missing refs: button, save
+```
+
+The tag name is upper case (it comes from `host.tagName`), and the
+message lists every required ref that was not found.
+
+Call to `r.all()` are **never reported**. A missing match resolves to an
+empty array, not an error.
+
+This check happens right before the custom element runs your `.setup` function.
+
+For a component with no contexts, refs are resolved at the moment the element
+connects to the DOM. For a component that declares
+[`withContexts`](#withcontexts), ref collection is deferred along
+with `setup` until every required context resolves.
+
+
+### Checking refs in tests
+
+A missing `r.one` ref throws while the component connects. When the browser
+runs a lifecycle callback (which is what `appendChild` triggers), it reports
+the exception to the global `error` event rather than propagating it to the
+caller, so a try / catch around `appendChild` sees nothing.
+
+You need to listen for the global `error` event. When every
+`data-ref` the component declares is present, nothing is reported.
 
 ```ts
-.setup(ctx => {
-    // ctx.host       the HTMLElement itself
-    // ctx.props      callable signals for each declared prop
-    // ctx.refs       resolved DOM refs
-    // ctx.contexts   consumed context values (reactive)
+import { test } from '@substrate-system/tapzero'
+import './my-counter.js'  // the component from the example above
 
-    // Run a tracked effect; auto-disposed on disconnect.
-    ctx.effect(() => {
-        document.title = ctx.props.label()
-    })
+test('all refs resolve', t => {
+    let err:Error|null = null
+    const onError = (ev:ErrorEvent) => { err = ev.error }
+    window.addEventListener('error', onError)
 
-    // Bind a DOM property to a signal expression; auto-cleaned.
-    ctx.bind(() => String(ctx.props.count()), el, { prop: 'textContent' })
+    const el = document.createElement('my-counter')
+    el.innerHTML = `
+        <div data-ref="display"></div>
+        <button data-ref="dec">-</button>
+        <button data-ref="inc">+</button>`
+    document.body.appendChild(el)
 
-    // Add an event listener; auto-removed on disconnect.
-    ctx.on(el, 'click', handler)
+    t.ok(err === null, 'no missing refs')
 
-    // Dispatch an event from the host. Pass a name (with optional
-    // detail/options) for a bubbling CustomEvent, or a pre-built
-    // Event. Returns dispatchEvent's result.
-    ctx.emit('change', { value: 42 })
-
-    // Read a signal without creating a subscription.
-    const snap = ctx.peek(ctx.props.count)
-
-    // Register arbitrary teardown logic.
-    ctx.onCleanup(() => { /* ... */ })
-
-    // Consume a context imperatively (returns value or undefined).
-    const theme = ctx.consume(ThemeToken)
+    window.removeEventListener('error', onError)
+    document.body.removeChild(el)
 })
 ```
 
-#### peek and untracked
 
-When you need a non-subscribing read outside of `ctx.peek`, both helpers are
-exported from the main entry:
-
-```ts
-import { peek, untracked } from 'microtags'
-
-ctx.effect(() => {
-    const current = peek(ctx.props.count)   // does NOT subscribe
-    untracked(() => {
-        // reads inside here do not subscribe either
-    })
-})
-```
-
-### Typed Events
+## Typed Events
 
 `TypedEvent<Target, Detail>` is a type-only helper that narrows
 `CustomEvent` to a specific `target` and `detail`. Combine it with
@@ -812,6 +942,7 @@ callback function mutates the DOM through properties like `textContent`.
 Nothing concatenates strings into markup, so there is no string-injection
 XSS vector.
 
+
 ## Subpath Exports
 
 ### `microtags/context`
@@ -881,6 +1012,10 @@ signal imperatively.
 ---
 
 ### `microtags/render`
+
+```ts
+import { render, renderList } from 'microtags/render'
+```
 
 A keyed reconciler for rendering lists and single items from a
 `<template>`, with no virtual DOM and no diffing library.
@@ -1149,8 +1284,6 @@ These nanotags APIs have no microtags equivalent:
 
 - `ctx.getElement` / `ctx.getElements` -- declare refs with `withRefs`, or
   call `ctx.host.querySelector` directly.
-- The `setup` mixin return value -- `setup` returns `void`; it does not
-  assign members back onto the element.
 - The `define(name, setupFn)` two-argument shorthand -- always use the
   builder chain ending in `.setup()`.
 

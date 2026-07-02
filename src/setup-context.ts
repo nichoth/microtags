@@ -6,6 +6,7 @@ import type {
     PropsSignals,
     PropDef,
     ContextToken,
+    BindOptions,
 } from './types.js'
 
 /**
@@ -65,7 +66,11 @@ export function makeSetupContext<
             cleanups.push(dispose)
         },
 
-        bind (source, control, opts) {
+        bind<T> (
+            source:Signal<T>,
+            control:Element,
+            opts?:BindOptions
+        ) {
             const input = control instanceof HTMLInputElement ?
                 control :
                 undefined

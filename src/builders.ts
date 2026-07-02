@@ -19,46 +19,6 @@ import {
 } from './util.js'
 import { factory } from './factory.js'
 
-function isPropOnly (def:unknown):def is PropertyOnlyProp<unknown> {
-    return (
-        typeof def === 'object' &&
-        def !== null &&
-        '_microtag' in def &&
-        (def as { _microtag: unknown })._microtag === 'prop'
-    )
-}
-
-function isStandardSchema (def:unknown):def is StandardSchemaV1 {
-    return (
-        typeof def === 'object' &&
-        def !== null &&
-        '~standard' in def
-    )
-}
-
-function normalizePropDef (
-    name:string,
-    def:PropDef<unknown>
-):Coercer<unknown> {
-    if (isPropOnly(def)) {
-        return (_raw:string | null) => def.initial
-    }
-    if (isStandardSchema(def)) {
-        const schema = def as StandardSchemaV1
-        return (raw:string | null):unknown => {
-            const result = schema['~standard'].validate(raw)
-            if (result instanceof Promise) {
-                throw new TypeError(
-                    `withProps: async schemas are not supported (prop "${name}")`
-                )
-            }
-            if (result.issues) return undefined
-            return result.value
-        }
-    }
-    return def as Coercer<unknown>
-}
-
 /** The DSL object passed to the withProps callback. */
 export type PropDSL = {
     number():Coercer<number>
@@ -200,7 +160,11 @@ export class ComponentBuilder<
         }
 
         return new ComponentBuilder<P, RefDefs, CtxDefs>(
-            this.tagName, coercers, observed, this._refDefs, this._ctxDefs
+            this.tagName,
+            coercers,
+            observed,
+            this._refDefs,
+            this._ctxDefs
         )
     }
 
@@ -270,4 +234,44 @@ export class ComponentBuilder<
 /** Create a new component builder for the given tag name. */
 export function define (tagName:string):ComponentBuilder {
     return new ComponentBuilder(tagName)
+}
+
+function isPropOnly (def:unknown):def is PropertyOnlyProp<unknown> {
+    return (
+        typeof def === 'object' &&
+        def !== null &&
+        '_microtag' in def &&
+        (def as { _microtag: unknown })._microtag === 'prop'
+    )
+}
+
+function isStandardSchema (def:unknown):def is StandardSchemaV1 {
+    return (
+        typeof def === 'object' &&
+        def !== null &&
+        '~standard' in def
+    )
+}
+
+function normalizePropDef (
+    name:string,
+    def:PropDef<unknown>
+):Coercer<unknown> {
+    if (isPropOnly(def)) {
+        return (_raw:string | null) => def.initial
+    }
+    if (isStandardSchema(def)) {
+        const schema = def as StandardSchemaV1
+        return (raw:string | null):unknown => {
+            const result = schema['~standard'].validate(raw)
+            if (result instanceof Promise) {
+                throw new TypeError(
+                    `withProps: async schemas are not supported (prop "${name}")`
+                )
+            }
+            if (result.issues) return undefined
+            return result.value
+        }
+    }
+    return def as Coercer<unknown>
 }
