@@ -262,11 +262,11 @@ export const myCounter = define('my-counter')
 There are two separate things people call "validation":
 
 1. **Prop validation** checks the attributes passed into a component.
-   Pass a [Standard Schema](https://standardschema.dev) (Zod, Valibot,
-   ArkType) to [`p.schema`](#withprops); it coerces the attribute value
-   and falls back to `undefined` when the value doesn't coerce.
-2. **Form input validation** -- client-side validation -- checks live user input
-   in a form, for example a value that changes on every keystroke.
+   Pass a [Standard Schema](https://standardschema.dev)
+   (Zod, Valibot, ArkType) to [`p.schema`](#withprops), and it coerces the
+   attribute value and falls back to `undefined` when the value doesn't coerce.
+2. **Form input validation** -- aka client-side validation -- checks live user
+   input in a form, for example a value that changes on every keystroke.
    There is no dedicated API for this. Validate the schema directly
    inside `.setup()` and hold the result as a signal.
 
@@ -413,19 +413,13 @@ and the submit button is disabled until valid. See `example/subscribe-form.ts`.
 
 ## Serverside Example
 
-See [./example/ssr.ts](./example/ssr.ts).
+See [./example/ssr.ts](./example/ssr.ts) for an example of rendering an HTML
+string and then "hydrating" the page on the client.
 
 ### `.TAG`
 
-Each tag name that you pass to `define` is exposed as a property `.TAG`
-on the return value. It is possible to import your web components in Node,
-even though Node does not have browser APIs.
-
-The `data-ref` attribute is a fallback. It's used when you don't pass a
-selector to `r.one()`. If you pass explicit CSS selectors to `withRefs`,
-e.g. `{ copy: r.one('button') }`, then the HTML does not require a `data-ref`
-attribute.
-
+Each tag name is exposed as a property `.TAG`. You can import the web
+components in Node, even though Node does not have browser APIs.
 
 ```ts
 import { MyCounter, CountBtn, CopyBtn } from './index.js'
@@ -469,9 +463,8 @@ export function render ():string {
 
 ### `.refs`
 
-Web components created with `microtags` have a property `.refs` that is an
-object of the ref names you created the coponent with. Use it to create
-`data-ref` attributes.
+Web components created with `microtags` have a property `.refs`. It is an
+object of ref names you passed in. Use it to create `data-ref` attributes.
 
 ```ts
 import { MyCounter } from '../example.js'
@@ -494,11 +487,11 @@ export function render () {
 
 ### `define`
 
+Function `define(tagName)` returns a [`ComponentBuilder`](#componentbuilder).
+
 ```js
 function define (tagName:string):ComponentBuilder
 ```
-
-Function `define(tagName)` returns a [`ComponentBuilder`](#componentbuilder).
 
 
 #### `ComponentBuilder`

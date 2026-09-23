@@ -7,7 +7,7 @@ import { ThemeProvider, ThemedCard } from './theme-toggle.js'
 import { NBSP } from './constants.js'
 
 // Server-render the full example page using each component's exposed
-// `.TAG` and `.refs`, so the markup never hardcodes a tag name or a
+// `.TAG` and `.refs`. The markup never hardcodes a tag name or a
 // `data-ref` value. `npm start` redirects this output into
 // example/index.html, so the page the browser hydrates is produced by
 // the SSR path first.
