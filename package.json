@@ -1,6 +1,6 @@
 {
   "name": "microtags",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "description": "Web component helper",
   "type": "module",
   "exports": {
