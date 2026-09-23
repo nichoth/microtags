@@ -1,8 +1,17 @@
 import neostandard, { plugins } from 'newneostandard'
-
 const tseslint = plugins['typescript-eslint']
 
 export default [
+    {
+        ignores: [
+            'lib.es5.d.ts',
+            'dist/**',
+            'public/**',
+            'test/*.js',
+            'bin/*.js',
+            'docs/**'
+        ]
+    },
     ...neostandard({
         ts: true,
         ignores: [
@@ -16,6 +25,9 @@ export default [
     }),
     ...tseslint.configs.recommended,
     {
+        plugins: {
+            '@stylistic': plugins['@stylistic'],
+        },
         rules: {
             '@typescript-eslint/no-unused-expressions': 'off',
             '@typescript-eslint/no-explicit-any': 'off',
