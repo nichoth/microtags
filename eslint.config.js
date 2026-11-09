@@ -9,7 +9,8 @@ export default [
             'public/**',
             'test/*.js',
             'bin/*.js',
-            'docs/**'
+            'docs/**',
+            '**/build'
         ]
     },
     ...neostandard({
