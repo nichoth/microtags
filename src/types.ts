@@ -10,6 +10,15 @@ export type Signal<T> = {
     (value:T):void
 }
 
+/**
+ * Shallow unwrap of signal-valued properties: each property that is a
+ * signal becomes its value type, other properties pass through. Use it
+ * to describe the plain data form of a state object.
+ */
+export type Serialized<T> = {
+    [K in keyof T]:T[K] extends Signal<infer V> ? V : T[K]
+}
+
 /** Converts a raw attribute string (or null) to T. */
 export type Coercer<T> = (raw:string | null) => T
 

@@ -18,6 +18,11 @@
       "import": "./dist/render.js",
       "require": "./dist/render.cjs"
     },
+    "./render-support": {
+      "types": "./dist/render-support.d.ts",
+      "import": "./dist/render-support.js",
+      "require": "./dist/render-support.cjs"
+    },
     "./context": {
       "types": "./dist/context.d.ts",
       "import": "./dist/context.js",
@@ -27,7 +32,43 @@
       "types": "./dist/util.d.ts",
       "import": "./dist/util.js",
       "require": "./dist/util.cjs"
+    },
+    "./build": {
+      "types": "./dist/build.d.ts",
+      "import": "./dist/build.js",
+      "require": "./dist/build.cjs"
+    },
+    "./esbuild": {
+      "types": "./dist/esbuild.d.ts",
+      "import": "./dist/esbuild.js",
+      "require": "./dist/esbuild.cjs"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "import": "./dist/vite.js",
+      "require": "./dist/vite.cjs"
+    },
+    "./htm": {
+      "browser": {
+        "types": "./dist/htm.browser.d.ts",
+        "import": "./dist/htm.browser.js"
+      },
+      "types": "./dist/htm.d.ts",
+      "import": "./dist/htm.js",
+      "require": "./dist/htm.cjs"
+    },
+    "./preact": {
+      "browser": {
+        "types": "./dist/preact.browser.d.ts",
+        "import": "./dist/preact.browser.js"
+      },
+      "types": "./dist/preact.d.ts",
+      "import": "./dist/preact.js",
+      "require": "./dist/preact.cjs"
     }
+  },
+  "bin": {
+    "microbuild": "./dist/cli.cjs"
   },
   "main": "dist/index.js",
   "types": "./dist/index.d.ts",
@@ -41,35 +82,69 @@
   "scripts": {
     "lint": "eslint \"./**/*.{ts,js}\"",
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
-    "test": "npm run typecheck && esbuild --bundle ./test/index.ts | tapout",
-    "test:ssr": "npx esbuild ./test/ssr.ts --bundle --format=cjs --platform=node | node",
+    "test": "npm run typecheck && esbuild --bundle --loader:.css=empty ./test/index.ts | tapout",
+    "test:ssr": "npx esbuild ./test/ssr.ts --bundle --format=cjs --platform=node --loader:.css=empty --alias:microtags=./src --define:import.meta.env='{\"DEV\":false,\"PROD\":true,\"SSR\":true,\"MODE\":\"production\"}' | node -",
+    "test:build": "npx esbuild ./test/build.ts --bundle --format=cjs --platform=node | node",
+    "test:plugins": "npx esbuild ./test/plugins.ts --bundle --format=cjs --platform=node --packages=external | node",
+    "test:cli": "npx esbuild ./test/cli.ts --bundle --format=cjs --platform=node | node",
     "test:importmap": "esbuild ./test/importmap/run.ts --bundle --platform=node --format=cjs --packages=external | node",
-    "build-cjs": "esbuild src/index.ts src/render.ts src/context.ts src/util.ts --bundle --packages=external --format=cjs --keep-names --tsconfig=tsconfig.build.json --outdir=./dist --out-extension:.js=.cjs --sourcemap",
-    "build-esm": "esbuild src/index.ts src/render.ts src/context.ts src/util.ts --bundle --packages=external --splitting --format=esm --metafile=dist/meta.json --keep-names --tsconfig=tsconfig.build.json --outdir=./dist --sourcemap && tsc --emitDeclarationOnly --project tsconfig.build.json --outDir dist",
-    "build-esm:min": "esbuild src/index.ts src/render.ts src/context.ts src/util.ts --format=esm --keep-names --bundle --tsconfig=tsconfig.build.json --minify --out-extension:.js=.min.js --outdir=./dist --sourcemap",
+    "build-cjs": "esbuild src/index.ts src/render.ts src/context.ts src/util.ts src/htm.ts src/htm.browser.ts src/render-support.ts src/preact.ts --bundle --packages=external --format=cjs --keep-names --tsconfig=tsconfig.build.json --outdir=./dist --out-extension:.js=.cjs --sourcemap",
+    "build-esm": "esbuild src/index.ts src/render.ts src/context.ts src/util.ts src/htm.ts src/htm.browser.ts src/render-support.ts src/preact.ts src/preact.browser.ts --bundle --packages=external --splitting --format=esm --metafile=dist/meta.json --keep-names --tsconfig=tsconfig.build.json --outdir=./dist --sourcemap && tsc --emitDeclarationOnly --project tsconfig.build.json --outDir dist",
+    "build-esm:min": "esbuild src/index.ts src/render.ts src/context.ts src/util.ts src/htm.ts src/htm.browser.ts src/render-support.ts src/preact.browser.ts --format=esm --keep-names --bundle --external:preact --tsconfig=tsconfig.build.json --minify --out-extension:.js=.min.js --outdir=./dist --sourcemap",
+    "build:node": "esbuild src/build.ts src/esbuild.ts src/vite.ts --bundle --packages=external --format=esm --keep-names --tsconfig=tsconfig.build.json --platform=node --outdir=./dist --sourcemap && esbuild src/build.ts src/esbuild.ts src/vite.ts --bundle --packages=external --format=cjs --keep-names --tsconfig=tsconfig.build.json --platform=node --outdir=./dist --out-extension:.js=.cjs --sourcemap",
+    "build:cli": "esbuild src/cli.ts --bundle --packages=external --format=cjs --keep-names --tsconfig=tsconfig.build.json --platform=node --outdir=./dist --out-extension:.js=.cjs --sourcemap --banner:js='#!/usr/bin/env node'",
     "build-example": "npm run build-html && mkdir -p ./public && rm -rf ./public/* && NODE_ENV=development vite --mode staging --base=\"/microtags\" build",
-    "build-docs": "typedoc --tsconfig tsconfig.build.json ./src/index.ts",
-    "build": "mkdir -p ./dist && rm -rf ./dist/* && npm run build-cjs && npm run build-esm && npm run build-esm:min",
+    "build-docs": "typedoc --tsconfig tsconfig.build.json --out api-docs ./src/index.ts",
+    "build": "mkdir -p ./dist && rm -rf ./dist/* && npm run build-cjs && npm run build-esm && npm run build-esm:min && npm run build:node && npm run build:cli",
     "build-html": "npm run --silent ssr > example/index.html",
     "size": "size-limit",
     "inject-size": "esbuild ./scripts/inject-size.ts --bundle --platform=node --format=cjs | node",
-    "start": "npm run build-html && vite",
+    "start": "npm run build-html && vite --open /example/",
+    "start:hydration": "npm run build:node && vite --config example-hydration/vite.config.ts --open /example-hydration/",
     "ssr": "esbuild ./example/ssr.ts --bundle --platform=node --format=cjs | node ",
-    "toc": "markdown-toc --maxdepth 4 -i README.md",
+    "typecheck:hydration": "tsc -p example-hydration/server/tsconfig.json --listFiles false",
+    "ssr:hydration": "esbuild ./example-hydration/server/ssr.ts --bundle --platform=node --format=cjs --loader:.css=empty --define:import.meta.env='{\"DEV\":false,\"PROD\":true,\"SSR\":true,\"MODE\":\"production\"}' | node -",
+    "toc": "markdown-toc --maxdepth 5 -i README.md",
+    "toc:hydration": "markdown-toc --maxdepth 3 -i example-hydration/README.md",
     "preversion": "npm run lint",
-    "version": "npm run toc && auto-changelog -p --template keepachangelog --breaking-pattern 'BREAKING CHANGE:' && npm run inject-size && git add CHANGELOG.md README.md",
+    "version": "npm run toc && npm run toc:hydration && auto-changelog -p --template keepachangelog --breaking-pattern 'BREAKING CHANGE:' && npm run inject-size && git add CHANGELOG.md README.md",
     "postversion": "git push --follow-tags && npm publish",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test:hydration": "npm run build:hydration && npx esbuild ./test/hydration.ts --bundle --format=esm --platform=node --packages=external --loader:.css=empty | node --input-type=module && npx esbuild ./test/hydration-listen.ts --bundle --format=esm --platform=node --packages=external | node --input-type=module",
+    "test:hydration-dev": "npm run build:node && npx esbuild ./test/hydration-dev.ts --bundle --format=cjs --platform=node --packages=external | node",
+    "build:hydration": "npm run build:node && vite build --config example-hydration/vite.config.ts && vite build --ssr --config example-hydration/vite.config.ts",
+    "serve:hydration": "node example-hydration/build/server/listen.js",
+    "test:e2e": "playwright test",
+    "gate": "rm -rf example-hydration/build && npm run lint && npm run build && npm run typecheck && npm run size && npm run test:bundles && npm test && npm run test:ssr && npm run test:preact-ssr && npm run test:build && npm run test:plugins && npm run test:cli && npm run test:hydration && npm run test:hydration-dev",
+    "test:preact-ssr": "npx esbuild ./test/preact-ssr.ts --bundle --format=cjs --platform=node --loader:.css=empty --alias:microtags=./src --define:import.meta.env='{\"DEV\":false,\"PROD\":true,\"SSR\":true,\"MODE\":\"production\"}' | node -",
+    "test:bundles": "npx esbuild ./test/bundles.ts --bundle --format=cjs --platform=node | node"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.0.0",
+    "preact": "^10.29.7"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    },
+    "preact": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@standard-schema/spec": "^1.1.0",
-    "alien-signals": "^3.2.1"
+    "alien-signals": "^3.2.1",
+    "htm": "^3.1.1"
   },
   "devDependencies": {
+    "@hono/node-server": "^2.1.1",
+    "@hono/vite-dev-server": "^0.26.1",
+    "@playwright/test": "^1.63.0",
     "@size-limit/preset-small-lib": "^12.1.0",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@substrate-system/debug": "^0.9.64",
     "@substrate-system/dom": "^0.1.13",
+    "@substrate-system/redeye": "^0.1.7",
     "@substrate-system/tapout": "^0.0.38",
     "@substrate-system/tapzero": "^0.10.16",
     "@types/node": "^26.0.1",
@@ -77,10 +152,14 @@
     "browserslist": "^4.28.4",
     "esbuild": "^0.28.0",
     "eslint": "^10.6.0",
+    "hono": "^4.13.9",
     "lightningcss": "^1.32.0",
     "markdown-toc": "^1.2.0",
     "nanotags": "^0.15.2",
     "newneostandard": "^0.14.1",
+    "nightralph": "^0.0.56",
+    "preact": "10.29.7",
+    "preact-render-to-string": "^6.8.2",
     "size-limit": "^12.1.0",
     "tap-spec": "^5.0.0",
     "typedoc": "^0.28.1",

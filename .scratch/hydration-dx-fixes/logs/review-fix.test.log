@@ -1,0 +1,620 @@
+
+> microtags@0.0.14 test
+> npm run typecheck && esbuild --bundle --loader:.css=empty ./test/index.ts | tapout
+
+
+> microtags@0.0.14 typecheck
+> tsc --noEmit -p tsconfig.typecheck.json
+
+# Running tests in chromium
+TAP version 13
+# placeholder test
+ok 1 test harness is wired
+# peek reads a signal without subscribing
+ok 2 effect runs once on creation
+ok 3 effect does NOT re-run when peeked signal changes
+# untracked reads do not create subscriptions
+ok 4 effect runs once on creation
+ok 5 effect does NOT re-run after untracked read
+# peek returns current signal value
+ok 6 peek returns current value
+ok 7 peek returns updated value
+# untracked restores subscription context
+ok 8 initial run
+ok 9 b change does not trigger re-run
+ok 10 a change does trigger re-run
+# define: registers a working custom element
+ok 11 created element is an HTMLElement
+ok 12 element is registered in customElements registry
+# reactive props: reading, writing, and reacting
+ok 13 effect reads initial prop value
+ok 14 effect ran once on connect
+ok 15 effect re-ran after writing to prop signal
+ok 16 effect ran twice total
+# factory: creates HTMLElement subclass with no shadow DOM
+ok 17 is an HTMLElement
+ok 18 no shadow DOM
+# factory: connectedCallback hydrates props from attributes
+ok 19 prop hydrated from attribute on connect
+# factory: attributeChangedCallback updates prop signal
+ok 20 effect ran once on connect
+ok 21 effect re-ran after attributeChangedCallback
+# factory: disconnectedCallback runs all registered cleanups
+ok 22 cleanups not run before disconnect
+ok 23 both cleanups ran on disconnect
+# factory: effects are disposed on disconnect
+ok 24 effect ran on connect
+ok 25 effect ran after signal change
+ok 26 effect did NOT run after disconnect
+# factory: reconnecting re-runs setup with fresh scope
+ok 27 setup ran once on first connect
+ok 28 cleanup ran on disconnect
+ok 29 setup re-ran on reconnect
+ok 30 cleanup ran again on second disconnect
+# factory: a same-tick insertBefore move keeps the host set up
+ok 31 no cleanups ran
+ok 32 setup did not run again
+# factory: a real removal runs cleanups once, after a microtask
+ok 33 cleanups ran exactly once
+ok 34 and not again
+# factory: removing a host twice in one tick cleans up once
+ok 35 cleanups ran once
+ok 36 setup ran once
+# factory: reconnecting after teardown runs setup again
+ok 37 first connection was torn down
+ok 38 setup ran again
+ok 39 second connection torn down
+# factory: reconnect preserves programmatically-set prop values
+ok 40 reconnect: programmatically-set value preserved
+# factory: cleanup errors: remaining cleanups run, first error re-throws
+ok 41 second cleanup ran despite first throwing
+ok 42 first error was re-thrown
+ok 43 correct error re-thrown
+# withProps: p.number() hydrates number from attribute
+ok 44 number prop coerced from attribute
+# withProps: p.string() hydrates string from attribute
+ok 45 string prop hydrated from attribute
+# withProps: p.boolean() coerces attribute presence
+ok 46 boolean true when attribute present
+ok 47 boolean false when attribute absent
+# withProps: p.json() parses attribute as JSON
+ok 48 json prop parsed from attribute
+# withProps: p.schema() accepts a Standard Schema validator
+ok 49 schema prop validated and coerced
+# withProps: p.prop() creates a property-only (non-observed) prop
+ok 50 prop() uses initial value
+ok 51 signal not updated by attribute set
+# withProps: observed attributes react to attributeChangedCallback
+ok 52 effect ran once on connect
+ok 53 effect re-ran after attribute change
+# withRefs: r.one resolves single [data-ref] element
+ok 54 r.one resolves to matching element
+# withRefs: r.all resolves multiple [data-ref] elements
+ok 55 r.all resolves to array
+ok 56 first element matches
+ok 57 second element matches
+# withRefs: r.all returns empty array when no matches
+ok 58 r.all returns array
+ok 59 empty array when no matches
+# withRefs: r.one throws when ref element not found
+ok 60 throws when r.one ref not found
+# withRefs: r.one(selector) resolves by CSS selector
+ok 61 r.one(selector) resolves by selector
+# withRefs: r.one(tag) resolves an element by tag name
+ok 62 r.one(tag) resolves the tag element
+# withRefs: r.all(selector) resolves multiple by CSS selector
+ok 63 r.all(selector) resolves to array
+ok 64 first selector element matches
+ok 65 second selector element matches
+# withContexts: context keys appear in ctx.contexts
+ok 66 contexts object present
+ok 67 context key present
+# ctx.on: listener is called and auto-removed on disconnect
+ok 68 listener fired on click
+ok 69 listener not called after disconnect
+# ctx.emit: string form dispatches a bubbling CustomEvent with detail
+ok 70 event bubbled up to document.body
+ok 71 detail passed through
+ok 72 returns dispatchEvent result when not canceled
+# ctx.emit: Event form dispatches as-is; returns false when canceled
+ok 73 returns false when a listener calls preventDefault
+# ctx.bind: updates DOM property reactively, stops after disconnect
+ok 74 initial value bound
+ok 75 value updated on signal change
+ok 76 binding stopped after disconnect
+# ctx.bind: two-way text input writes user input to signal
+ok 77 forward: input value set from signal
+ok 78 forward: signal change updates input
+ok 79 write-back: input event to signal
+# ctx.bind: checkbox auto-detects checked/change
+ok 80 forward: box unchecked from signal
+ok 81 forward: signal change checks the box
+ok 82 write-back: change event updates signal
+# ctx.bind: getter one-way derives a property from a signal
+ok 83 getter sets textContent
+ok 84 re-runs when read signal changes
+# ctx.bind: number input auto-detects valueAsNumber/input
+ok 85 forward: valueAsNumber from signal
+ok 86 forward: signal change updates input
+ok 87 write-back: input event updates signal as number
+# ctx.peek: no subscription inside ctx.effect
+ok 88 effect ran once on connect
+ok 89 effect did not re-run (peek does not subscribe)
+# ctx.consume: returns undefined for unresolved context token
+ok 90 consume returns undefined when no provider
+# define: setup() registers the custom element
+ok 91 element registered
+# define: setup() returns the element class
+ok 92 returned class is the registered element class
+# define: builder exposes TAG
+ok 93 TAG returns the tag name
+# define: TAG is available after withProps/withRefs
+ok 94 TAG propagates through the fluent chain
+# define: setup() element class exposes static TAG
+ok 95 registered class carries its tag name
+# define: full chain registers and works
+ok 96 prop resolved via define chain
+# withProps + withRefs + withContexts chain type-checks
+ok 97 prop correctly typed and resolved
+ok 98 ref correctly resolved in full chain
+# createContext: returns a token with a symbol id
+ok 99 id is a symbol
+# createContext: each token has a unique id
+ok 100 distinct tokens have distinct ids
+# provide + withContexts: value available in ctx.contexts
+ok 101 context value available in ctx.contexts
+# deferred setup: setup waits until context resolves
+ok 102 setup not called before context provided
+ok 103 setup called after context provided
+# context reactivity: effect re-runs when context value changes
+ok 104 initial value read
+ok 105 effect ran once on setup
+ok 106 effect re-ran on context update
+ok 107 effect ran twice total
+# ctx.consume: reads optional context value from ancestor
+ok 108 ctx.consume reads context from ancestor
+# render: stamps template into container
+ok 109 one child after render
+# render: calling render again with same template reuses element
+ok 110 same element reused across renders
+ok 111 still one child
+# render: works with no options
+ok 112 one child with no options
+# renderList: renders items from data array
+ok 113 two children for two items
+# renderList: removes items no longer in data
+ok 114 two children initially
+ok 115 one child after removal
+# renderList: reuses existing elements by key
+ok 116 same DOM element reused for same key
+# attribute hydration: props initialized from attributes on connect
+ok 117 string prop hydrated from attribute
+ok 118 number prop hydrated from attribute
+ok 119 boolean prop hydrated from attribute presence
+# attributeChangedCallback: updates prop signal on attribute change
+ok 120 initial value hydrated from attribute
+ok 121 effect ran once on connect
+ok 122 prop signal updated by attributeChangedCallback
+ok 123 effect re-ran after attribute change
+ok 124 second attribute change also updates signal
+ok 125 effect ran three times total
+# refs: r.one resolves single and r.all resolves multiple via define()
+ok 126 r.one resolves to matching element
+ok 127 r.all returns an array
+ok 128 r.all finds both matching elements
+ok 129 first r.all element matches
+ok 130 second r.all element matches
+# context: ctx.consume reads provided value from ancestor element
+ok 131 ctx.consume reads context value from ancestor
+# context: deferred setup waits for ALL required contexts
+ok 132 setup not called with no contexts provided
+ok 133 setup not called when only first context provided
+ok 134 setup runs only after both contexts are provided
+# context: consumer effect re-runs when context value changes
+ok 135 initial context value read by effect
+ok 136 effect ran once on setup
+ok 137 effect re-ran on context value change
+ok 138 effect ran twice total
+ok 139 effect re-ran on second value change
+ok 140 effect ran three times total
+# untracked: reading inside ctx.effect does not create subscription
+ok 141 effect runs once on setup
+ok 142 effect did not re-run after untracked read
+ok 143 still no re-run on second change
+# cleanup: ctx.on listener removed on disconnect
+ok 144 listener fires before disconnect
+ok 145 listener not called after disconnect
+# cleanup: ctx.effect disposed on disconnect
+ok 146 effect ran on connect
+ok 147 effect ran after signal change
+ok 148 effect did not run after disconnect
+# cleanup: ctx.bind stops updating DOM property on disconnect
+ok 149 binding active on connect
+ok 150 binding updates on signal change
+ok 151 binding stopped after disconnect
+# cleanup: ctx.onCleanup callback runs on disconnect
+ok 152 cleanup not called before disconnect
+ok 153 cleanup called on disconnect
+# cleanup: throwing cleanup - remaining run, first error re-throws
+ok 154 second cleanup ran despite first throwing
+ok 155 third cleanup ran despite first throwing
+ok 156 error was re-thrown
+ok 157 correct error re-thrown
+# renderList: skips update when data item is unchanged
+ok 158 update called only once when item is same ref
+# render: inserting static render output upgrades and runs setup
+ok 159 setup ran after inserting rendered markup
+ok 160 ref resolved
+ok 161 ref resolved from rendered data-ref attribute
+# html: plain tag with attributes and text
+ok 162 returns a string
+ok 163 parsed to a div
+ok 164 class attr
+ok 165 id attr
+ok 166 text content
+# html: escapes interpolated strings
+ok 167 no raw <script> in output
+ok 168 text content equals original value
+# html: raw passes through as markup
+ok 169 raw markup parsed as element
+ok 170 inner text
+# html: element class as tag calls static render
+ok 171 host element present
+ok 172 declared prop serialized as attribute
+ok 173 undeclared prop passed as attr
+ok 174 render output present inside host
+# html: nested components not double-escaped
+ok 175 inner component rendered
+ok 176 inner render output present
+ok 177 inner child component should be expanded
+# html: void elements emit no closing tag
+ok 178 no closing input tag
+ok 179 non-void has closing tag
+# browser html: an unclosed void element with children throws
+ok 180 error names the tag
+# mount: self-closed void elements are created
+ok 181 input created
+ok 182 br created
+ok 183 following element kept
+ok 184 input has no children
+# html: array children from map
+ok 185 one li per item
+ok 186 first item
+ok 187 second item
+ok 188 third item
+# html: inserting output upgrades defined components
+ok 189 setup ran after inserting html output
+# html: String() and interpolation yield plain markup
+ok 190 no marker class name in stringified output
+ok 191 no [object in stringified output
+ok 192 interpolation yields clean markup
+# prop accessor: reading host.<prop> returns the current value
+ok 193 reads the hydrated value
+ok 194 reads the value after an attribute change
+# prop accessor: assigning a value updates the setup signal
+ok 195 effect re-ran with the assigned value
+ok 196 reads the assigned value
+# prop accessor: assigning a signal makes the prop follow it
+ok 197 reads through to the signal
+ok 198 follows later signal writes
+ok 199 setup effect tracks it
+ok 200 attribute does not override a bound signal
+ok 201 a plain value replaces the binding
+ok 202 old signal no longer drives the prop
+# bindProp: the host prop reads and tracks the signal
+ok 203 reads the bound value
+ok 204 follows later changes
+ok 205 setup effect tracks it
+# prop accessor: writing a bound prop in setup throws
+ok 206 the write throws
+ok 207 message names the tag
+ok 208 message names the prop
+ok 209 the bound signal keeps its value
+ok 210 the prop still reads the bound value
+# prop accessor: writing a prop bound to a computed throws
+ok 211 the write throws, not silently dropped
+ok 212 the prop still reads the computed
+# prop accessor: an unbound prop is writable by its setup
+ok 213 the setup write is visible on the host
+# prop accessor: a new signal from outside replaces the binding
+ok 214 reads the new signal
+ok 215 the old signal no longer drives the prop
+ok 216 setup sees the new signal
+# prop accessor: pre-upgrade assignments are picked up
+ok 217 plain value picked up at upgrade
+ok 218 signal picked up at upgrade
+ok 219 upgraded host follows the signal
+ok 220 setup saw both values
+# mount: creates elements, including a kept host that upgrades
+ok 221 creates the outer element
+ok 222 creates the nested element
+ok 223 host is upgraded
+ok 224 host has its markup
+ok 225 host setup ran
+ok 226 host prop is set
+# mount: creating a host registers render support
+ok 227 host was created
+ok 228 render works with no separate support import
+# mount: markup from another package copy creates elements
+ok 229 creates the outer element
+ok 230 creates the nested element
+ok 231 no escaped text in place
+# mount: another copy's markup nested in a template
+ok 232 nested markup is an element
+ok 233 nested raw is an element
+# String(): another copy's markup is not escaped
+ok 234 nested markup is HTML
+# mount: a signal component prop updates the host
+ok 235 reads the signal value
+ok 236 follows the signal
+ok 237 setup effect saw the change
+# mount: a signal attribute updates; false/null/undefined remove
+ok 238 initial value
+ok 239 updated
+ok 240 function attribute updates
+ok 241 false removes the attribute
+ok 242 null removes the attribute
+ok 243 undefined removes the attribute
+# mount: on<event> listeners on a plain element and a host
+ok 244 plain element listener fired
+ok 245 host listener fired
+# mount: dispose stops updates and listeners, keeps the DOM
+ok 246 attribute no longer updates
+ok 247 listener no longer fires
+ok 248 node still in the container
+# mount: mounting twice on one container throws
+ok 249 second mount throws
+# mount: creating a component with no render link throws
+ok 250 error names the tag
+# region: a conditional adds and removes its content
+ok 251 absent when falsy
+ok 252 added when truthy
+ok 253 removed when falsy
+# region: plain text updates without replacing neighbours
+ok 254 node before is kept
+ok 255 node after is kept
+ok 256 text node is patched in place
+ok 257 text follows the signal
+# region: reordering a keyed list moves the same nodes
+ok 258 same number of items
+ok 259 c moved to the front
+ok 260 a is the same node
+ok 261 b is the same node
+# region: adding and removing keyed items touches only those
+ok 262 one removed, one added
+ok 263 a kept
+ok 264 c kept
+ok 265 d created
+ok 266 b removed
+# region: a host in a keyed list keeps identity on reorder
+ok 267 b host is the same node
+ok 268 a host is the same node
+ok 269 no host was set up again
+# region: without moveBefore, a reorder keeps host state
+ok 270 setup ran once per host
+ok 271 state from setup survived the reorder
+# region: duplicate keys in one region throw naming the key
+ok 272 mount throws
+ok 273 message names the key
+# region: duplicate keys introduced by an update throw
+ok 274 message names the key
+# region: a throwing moveBefore falls back to insertBefore
+ok 275 same number of items
+ok 276 c moved to the front
+ok 277 a is second
+ok 278 b is third
+# region: a missing moveBefore falls back to insertBefore
+ok 279 same number of items
+ok 280 c moved to the front
+ok 281 a is second
+ok 282 b is third
+# region: unkeyed same-tag children are patched in place
+ok 283 same node
+ok 284 attribute updated
+# region: a kept host has its props rebound
+ok 285 host is kept
+ok 286 prop rebound to the new value
+# region: host markup untouched, children range updated
+ok 287 host kept
+ok 288 own markup node kept
+ok 289 own markup not reconciled
+ok 290 child patched in place
+ok 291 children range updated
+# region: dispose stops region updates
+ok 292 region did not update
+# controls: a bound value is a property, not an attribute
+ok 293 input shows the bound value
+ok 294 textarea shows the bound value
+ok 295 no value attribute on the input
+ok 296 input follows the signal
+ok 297 textarea follows the signal
+ok 298 still no value attribute
+# controls: an edit survives a re-render; a new bound value wins
+ok 299 input is kept
+ok 300 unrelated re-render keeps the edit
+ok 301 a changed bound value replaces the edit
+# controls: a toggle survives a re-render; a new bound value wins
+ok 302 starts unchecked
+ok 303 visitor checked it
+ok 304 checkbox is kept
+ok 305 unrelated re-render keeps the toggle
+ok 306 a changed bound value replaces it
+# controls: a select created with a bound value selects it
+ok 307 the matching option is selected
+ok 308 option b is selected
+ok 309 select follows the signal
+# controls: null bound to value is an empty string
+ok 310 null writes an empty string
+ok 311 undefined writes an empty string
+# controls: String() still emits control values as attributes
+ok 312 value is an attribute
+ok 313 checked is an attribute
+ok 314 selected is an attribute
+# adopt: mounting over existing children creates no nodes
+ok 315 node count unchanged
+ok 316 every node is the same
+# adopt: a signal prop updates the adopted host
+ok 317 host is the same node
+ok 318 host follows the signal
+# adopt: a bound attribute and a listener work
+ok 319 attribute is bound
+ok 320 listener is attached
+ok 321 button is the same node
+# adopt: a conditional region adds and removes content
+ok 322 content adopted
+ok 323 content removed
+ok 324 content added back
+# adopt: a keyed list of hosts reorders with identity kept
+ok 325 no host created
+ok 326 b moved to the front
+ok 327 a is the same node
+# adopt: a host whose render link was stripped is adopted
+ok 328 host kept
+ok 329 prop bound
+# adopt: a host children range is bound; no range is skipped
+ok 330 adoption changed nothing
+ok 331 content in the range is bound
+ok 332 children of a host with no range are skipped
+# adopt: a region before the children leaves them bound
+ok 333 adoption changed nothing
+ok 334 listener in the children is bound
+# adopt: nested hosts and regions do not end the children early
+ok 335 outer children bound on adoption
+ok 336 host kept
+ok 337 button kept
+ok 338 children range morphed whole
+ok 339 listener rebound once
+# adopt: a tag mismatch warns and leaves that subtree
+ok 340 warned once
+ok 341 nothing changed on adoption
+ok 342 mismatched subtree untouched
+ok 343 sibling still bound
+# adopt: mismatch lookahead stays inside a region range
+ok 344 adoption changed nothing
+ok 345 region markup did not bind outside its range
+ok 346 sibling after the region is bound
+# adopt: an extra server node costs one warning
+ok 347 at most one warning
+ok 348 adoption changed nothing
+ok 349 skipped server node is the same node
+ok 350 later sibling is bound
+# adopt: a missing server node costs one warning
+ok 351 one warning
+ok 352 adoption changed nothing
+ok 353 server node is the same node
+ok 354 later sibling is bound
+# adopt: a button after a multi-node raw() is bound
+ok 355 no adoption warning
+ok 356 adoption changed nothing
+ok 357 listener is attached
+# adopt: a text-leading raw() after text keeps the next button
+ok 358 no adoption warning
+ok 359 adoption changed nothing
+ok 360 listener is attached
+# adopt: a bound attribute after text-and-element raw() updates
+ok 361 no adoption warning
+ok 362 adoption changed nothing
+ok 363 attribute is bound
+# adopt: static attributes are not written
+ok 364 no attribute mutations
+# adopt: a bound attribute that matches is not written
+ok 365 no attribute mutations
+ok 366 a later change is written
+ok 367 attribute follows the signal
+# adopt: a bound attribute that differs is written once
+ok 368 one write per differing attribute
+ok 369 value written
+ok 370 false removes the attribute
+ok 371 later changes still apply
+ok 372 later true adds the attribute
+# adopt: a control whose attribute matches is not written
+ok 373 no attribute mutations
+ok 374 the typed value is untouched
+# adopt: a control whose attribute differs gets the bound value
+ok 375 the property holds the bound value
+# adopt: an edit survives a re-render; a new bound value wins
+ok 376 unrelated re-render keeps the edit
+ok 377 a changed bound value replaces the edit
+# adopt: an edit in an adopted region survives a re-render
+ok 378 input is kept
+ok 379 unrelated re-render keeps the edit
+ok 380 a changed bound value replaces the edit
+# adopt: a checked checkbox bound true is not written
+ok 381 no attribute mutations
+ok 382 bound true matches the server: no write
+ok 383 bound false unchecks it
+# adopt: an iframe does not reload
+ok 384 no second load event
+# adopt: dispose stops updates and leaves the DOM
+ok 385 region did not update
+ok 386 DOM left in place
+# all done
+# example Counter: count prop drives the badge; buttons emit
+ok 387 counter is defined
+ok 388 badge is defined
+ok 389 buttons emit events
+ok 390 counter does not change the count itself
+ok 391 outside count is shown
+# example Badge: assigning label updates its text element
+ok 392 plain value updates the text
+ok 393 signal value updates the text
+ok 394 signal change updates the text
+# example Notice: dismiss emits and does not remove the host
+ok 395 dispatches one dismiss event
+ok 396 host is still connected
+# example notice page: state opens and dismisses the notice
+ok 397 closed by default
+ok 398 show opens the notice in state
+ok 399 one notice host is added
+ok 400 dismiss closes it in state
+ok 401 the notice host is removed
+ok 402 it can be opened again
+# mount: a spread skips an invalid attribute name
+ok 403 create: only the valid attribute
+ok 404 String(): only the valid attribute
+ok 405 patched
+ok 406 patch: no invalid attribute
+ok 407 adopt: only the valid one
+# mount: a host skips an invalid extra attribute name
+ok 408 host has only the valid one
+# mount: a signal attribute with an invalid name is never written
+ok 409 valid signal updates
+ok 410 invalid names never written
+# parity table: browser String() matches the expected HTML
+ok 411 plain attribute with &
+ok 412 plain attribute with quotes
+ok 413 plain attribute with <
+ok 414 plain attribute from a function
+ok 415 plain attribute with a number
+ok 416 plain attributes true, false, null, undefined
+ok 417 host attribute with &
+ok 418 host attribute with quotes
+ok 419 host attribute with <
+ok 420 host attribute from a function
+ok 421 host attribute with a number
+ok 422 host attributes true, false, null, undefined
+ok 423 host declared prop with & and <
+ok 424 nested markup
+ok 425 nested markup as host children
+# parity table: server and browser emit the same HTML
+ok 426 plain attribute with &
+ok 427 plain attribute with quotes
+ok 428 plain attribute with <
+ok 429 plain attribute from a function
+ok 430 plain attribute with a number
+ok 431 plain attributes true, false, null, undefined
+ok 432 host attribute with &
+ok 433 host attribute with quotes
+ok 434 host attribute with <
+ok 435 host attribute from a function
+ok 436 host attribute with a number
+ok 437 host attributes true, false, null, undefined
+ok 438 host declared prop with & and <
+ok 439 nested markup
+ok 440 nested markup as host children
+
+1..440
+# tests 440
+# pass  440
+
+# ok

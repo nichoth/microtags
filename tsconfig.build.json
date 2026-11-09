@@ -6,6 +6,8 @@
     },
     "exclude": [
         "example",
-        "test"
+        "example-hydration",
+        "test",
+        "src/cli.ts"
     ]
 }

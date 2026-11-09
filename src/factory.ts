@@ -79,7 +79,7 @@ function collectRefs (
 /**
  * Create an HTMLElement subclass with the microtags lifecycle.
  * The returned class has no Shadow DOM, tracks its own prop signals,
- * and runs setup() on connect / cleanups on disconnect.
+ * and runs setup() on connect / cleanups a microtask after disconnect.
  */
 export function factory<Props extends FactoryProps = FactoryProps> (
     config:FactoryConfig<Props>
@@ -96,16 +96,44 @@ export function factory<Props extends FactoryProps = FactoryProps> (
         static get observedAttributes () { return observedAttrNames }
 
         _props:Record<string, Signal<unknown>> = {}
+        // Per prop: the external signal assigned to the accessor, if any.
+        _bound:Record<string, Signal<Signal<unknown>|undefined>> = {}
         _cleanups:(() => void)[] = []
+        // Connected and set up, not yet torn down.
+        _live = false
 
         constructor () {
             super()
             for (const [name, coercer] of Object.entries(propDefs)) {
-                this._props[name] = signal(coercer(null))
+                const own = signal(coercer(null))
+                const bound = signal<Signal<unknown>|undefined>(undefined)
+                this._bound[name] = bound
+                // Reads go through the bound signal when one is set,
+                // so setup's prop signal tracks it. A bound prop is
+                // owned by the parent, so writing it here throws.
+                this._props[name] = ((...args:unknown[]) => {
+                    const ext = bound()
+                    if (!args.length) return ext ? ext() : own()
+                    if (ext) {
+                        throw new Error(`${this.localName}: prop "${name}"` +
+                            ' is bound and read-only; emit an event instead')
+                    }
+                    own(args[0])
+                }) as Signal<unknown>
+                // Pick up a property set before the upgrade; it
+                // shadows the prototype accessor until removed.
+                if (Object.prototype.hasOwnProperty.call(this, name)) {
+                    const pre = (this as any)[name]
+                    delete (this as any)[name]
+                    ;(this as any)[name] = pre
+                }
             }
         }
 
         connectedCallback () {
+            // Back before the queued teardown ran: this was a move.
+            if (this._live) return
+            this._live = true
             // Start a fresh cleanup scope for each connection cycle.
             this._cleanups = []
 
@@ -113,7 +141,7 @@ export function factory<Props extends FactoryProps = FactoryProps> (
             // programmatically-set value when the attribute is absent.
             for (const [name, coercer] of Object.entries(propDefs)) {
                 const attrVal = this.getAttribute(name)
-                if (attrVal !== null) {
+                if (attrVal !== null && !this._bound[name]()) {
                     (this._props[name] as Signal<unknown>)(coercer(attrVal))
                 }
             }
@@ -187,19 +215,62 @@ export function factory<Props extends FactoryProps = FactoryProps> (
             next:string|null
         ) {
             const coercer = propDefs[name]
-            if (coercer !== undefined && this._props[name] !== undefined) {
+            if (
+                coercer !== undefined &&
+                this._props[name] !== undefined &&
+                !this._bound[name]()
+            ) {
                 (this._props[name] as Signal<unknown>)(coercer(next))
             }
         }
 
+        // A DOM move (`moveBefore`) keeps the host set up
+        connectedMoveCallback () {}
+
+        // Teardown waits a microtask, so a host removed and re-inserted
+        // in the same tick (`insertBefore` without `moveBefore`) keeps
+        // its setup.
         disconnectedCallback () {
-            // Snapshot and clear BEFORE running so re-entrant calls are safe
-            // and the array is always empty after this returns (or throws).
-            const fns = this._cleanups
-            this._cleanups = []
-            runAll(fns)
+            queueMicrotask(() => {
+                if (this.isConnected || !this._live) return
+                this._live = false
+                // Snapshot and clear BEFORE running so re-entrant calls
+                // are safe and the array is empty after this throws.
+                const fns = this._cleanups
+                this._cleanups = []
+                runAll(fns)
+            })
         }
     }
 
+    // One accessor per prop. A function value is taken to be a signal
+    // and bound; anything else unbinds and writes the prop.
+    for (const name of Object.keys(propDefs)) {
+        Object.defineProperty(MicrotagElement.prototype, name, {
+            get (this:MicrotagElement) { return this._props[name]() },
+            set (this:MicrotagElement, v:unknown) {
+                if (typeof v === 'function') {
+                    this._bound[name](v as Signal<unknown>)
+                } else {
+                    this._bound[name](undefined)
+                    this._props[name](v)
+                }
+            },
+            configurable: true,
+        })
+    }
+
     return MicrotagElement
+}
+
+/**
+ * Bind a signal (or computed) to a declared prop of a host, so the prop
+ * reads through to it. Same as assigning the signal to the accessor,
+ * but typed: the signal's value must match the prop's type.
+ */
+export const bindProp = <
+    H extends HTMLElement,
+    K extends Exclude<keyof H, keyof HTMLElement>,
+> (host:H, name:K, source:() => H[K]):void => {
+    (host as any)[name] = source
 }

@@ -1,11 +1,23 @@
 import { define } from '../src/index.js'
 import { refsDSL } from '../src/builders.js'
+import { html, type Markup } from '../src/htm.js'
 import type {
     RefsMap,
     SingleRefDef,
     MultipleRefDef,
     TypedEvent,
 } from '../src/types.js'
+import type {
+    Signal as PublicSignal,
+    Serialized as PublicSerialized,
+    RenderParts as PublicRenderParts,
+} from 'microtags'
+import { bindProp } from 'microtags'
+import { signal, computed } from 'alien-signals'
+import { toPreact } from 'microtags/preact'
+import type { toPreact as serverToPreact } from '../src/preact.js'
+import type { toPreact as browserToPreact } from '../src/preact.browser.js'
+import type { toPreact as distServerToPreact } from '../dist/preact.js'
 
 /**
  * Compile-time assertions for the typed-refs feature. This file is never
@@ -102,6 +114,41 @@ type _refKeys = Expect<Equal<
     'display' | 'dec' | 'copy'
 >>
 
+// Static render is typed from withProps: wrong prop type fails typecheck.
+const _renderProbe = define('mt-render-probe')
+    .withProps(r => ({
+        count: r.number(),
+        label: r.string(),
+    }))
+    .render(({ props }) => `<span>${props.count}</span>`)
+    .setup(() => {})
+
+// Correct usage compiles
+_renderProbe.render({ count: 5, label: 'hi' })
+
+// @ts-expect-error: string where number expected
+_renderProbe.render({ count: 'bad', label: 'hi' })
+
+// renderParts takes the same typed props and returns RenderParts.
+type _renderPartsReturn = Expect<Equal<
+    ReturnType<typeof _renderProbe.renderParts>,
+    PublicRenderParts
+>>
+type _renderPartsShape = Expect<Equal<
+    PublicRenderParts,
+    { tag:string; attrs:Record<string, string>; html:string }
+>>
+_renderProbe.renderParts({ count: 5, label: 'hi' }, { children: '' })
+
+// @ts-expect-error: string where number expected
+_renderProbe.renderParts({ count: 'bad', label: 'hi' })
+
+// props static lists declared names
+type _renderProps = Expect<Equal<
+    typeof _renderProbe.props,
+    readonly ('count' | 'label')[]
+>>
+
 // A component that declares no refs still exposes an empty `.refs` map.
 const _noRefsProbe = define('mt-norefs-probe').setup(() => {})
 type _refsEmpty = Expect<Equal<keyof typeof _noRefsProbe.refs, never>>
@@ -121,3 +168,106 @@ class XTabs extends HTMLElement {}
 declare const _tabsEvt:TypedEvent<XTabs, { index:number }>
 expectAssignable<XTabs>(_tabsEvt.target)
 expectAssignable<CustomEvent>(_tabsEvt)
+
+// `html` returns opaque markup, not a string.
+const _markup = html`<p>hi</p>`
+type _isMarkup = Expect<Equal<typeof _markup, Markup>>
+// @ts-expect-error: markup is not assignable to string
+const _notString:string = _markup
+
+// Hosts expose a typed accessor for each declared prop.
+const _AccessorProbe = define('mt-accessor-probe')
+    .withProps(p => ({ count: p.number(), label: p.string() }))
+    .setup(() => {})
+declare const _accessorHost:InstanceType<typeof _AccessorProbe>
+type _accessorCount = Expect<Equal<typeof _accessorHost.count, number>>
+type _accessorLabel = Expect<Equal<typeof _accessorHost.label, string>>
+_accessorHost.count = 3
+// @ts-expect-error: string where number expected
+_accessorHost.count = 'bad'
+
+// bindProp takes a signal or computed whose value matches the prop type.
+bindProp(_accessorHost, 'count', signal(1))
+bindProp(_accessorHost, 'label', computed(() => 'x'))
+// @ts-expect-error: a string signal for a number prop
+bindProp(_accessorHost, 'count', signal('1'))
+// @ts-expect-error: a number computed for a string prop
+bindProp(_accessorHost, 'label', computed(() => 1))
+// @ts-expect-error: only declared props, not HTMLElement properties
+bindProp(_accessorHost, 'id', signal('x'))
+
+// Signal and Serialized are public types on the core entry.
+type _serializedPublic = Expect<Equal<
+    PublicSerialized<{ n:PublicSignal<number> }>,
+    { n:number }
+>>
+
+// Serialized unwraps each signal property to its value type.
+type _serializedUnwrap = Expect<Equal<
+    PublicSerialized<{ a:PublicSignal<number>; b:PublicSignal<string[]> }>,
+    { a:number; b:string[] }
+>>
+
+// Non-signal properties pass through Serialized unchanged.
+type _serializedPassThrough = Expect<Equal<
+    PublicSerialized<{
+        a:PublicSignal<number>;
+        n:number;
+        tags:string[];
+        meta:{ id:string }|null;
+    }>,
+    { a:number; n:number; tags:string[]; meta:{ id:string }|null }
+>>
+
+// The unwrap is shallow: signals nested inside a property are kept.
+type _serializedShallow = Expect<Equal<
+    PublicSerialized<{
+        outer:PublicSignal<{ inner:PublicSignal<number> }>;
+        plain:{ inner:PublicSignal<string> };
+    }>,
+    {
+        outer:{ inner:PublicSignal<number> };
+        plain:{ inner:PublicSignal<string> };
+    }
+>>
+
+// microtags/preact: the adapter's props are typed from the class.
+const PreactEl = define('types-preact')
+    .withProps(p => ({ count: p.number(), label: p.string() }))
+    .render(({ props }) => `${props.count}`)
+    .setup(() => {})
+const _PreactC = toPreact(PreactEl, {
+    events: { onChange: 'types-preact:change' },
+})
+type PreactCProps = Parameters<typeof _PreactC>[0]
+
+// Declared props are accepted with their types; so is a mapped callback.
+export const _preactOk:PreactCProps = {
+    count: 1,
+    label: 'a',
+    onChange: (_ev:CustomEvent) => {},
+    class: 'c',
+    id: 'i',
+    'aria-label': 'l',
+    'data-x': 1,
+}
+type _preactCount = Expect<Equal<PreactCProps['count'], number | undefined>>
+
+// @ts-expect-error an undeclared prop
+export const _preactUndeclared:PreactCProps = { nope: 1 }
+// @ts-expect-error a wrongly typed prop
+export const _preactWrongType:PreactCProps = { count: 'one' }
+// @ts-expect-error children
+export const _preactChildren:PreactCProps = { children: 'kid' }
+
+// The browser build of microtags/preact has the same type as the
+// default build. The root typecheck resolves `microtags/preact` with
+// the `browser` condition, so that import is the browser build too.
+type _preactBuildsEqual = Expect<Equal<
+    typeof browserToPreact,
+    typeof serverToPreact
+>>
+type _preactPublicEqual = Expect<Equal<
+    typeof toPreact,
+    typeof distServerToPreact
+>>

@@ -18,4 +18,4 @@ interface Array<T> {
     : Exclude<S, Falsy>[];
 }
 
-declare module '@substrate-system/button/css'
+declare module '@substrate-system/button/css' {}

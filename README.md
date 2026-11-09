@@ -11,12 +11,16 @@
 
 Web component helper with reactive props, automatic cleanup, and
 [no Shadow DOM](https://gomakethings.com/the-shadow-dom-is-an-antipattern/).
-Reactive via [alien-signals](https://github.com/stackblitz/alien-signals).
+Reactive via [`alien-signals`](https://github.com/stackblitz/alien-signals),
+inspired by [`nanotags`](https://github.com/psd-coder/nanotags).
 
-**Size: <!-- size -->3.48 KB<!-- /size -->** with all dependencies, minified and brotlied
+This package adds some provisions for serverside rendering.
 
-Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
-**alien-signals** instead of nanostores atoms.
+| Entry | Size (min + brotli) |
+|-------|---------------------|
+| `microtags` | <!-- size -->4.01 KB<!-- /size --> |
+| `microtags/htm` | <!-- size:htm -->1.23 KB<!-- /size:htm --> |
+| `microtags/preact` | <!-- size:preact -->0.44 KB<!-- /size:preact --> |
 
 <details><summary><h2>Contents</h2></summary>
 
@@ -37,6 +41,7 @@ Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
 - [Serverside Example](#serverside-example)
   * [`.TAG`](#tag)
   * [`.refs`](#refs)
+- [Hydration](#hydration)
 - [API](#api)
   * [`define`](#define)
     + [`ComponentBuilder`](#componentbuilder)
@@ -46,8 +51,12 @@ Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
   * [`builder.withRefs(fn)`](#builderwithrefsfn)
   * [`builder.withContexts`](#builderwithcontexts)
     + [`.withContexts` Example](#withcontexts-example)
+  * [`builder.render(fn, options?)`](#builderrenderfn-options)
   * [`builder.setup(ctx)`](#buildersetupctx)
     + [`ctx`](#ctx)
+      - [`ctx` Methods](#ctx-methods)
+      - [`ctx.bind`](#ctxbind)
+  * [`bindProp`](#bindprop)
 - [Missing refs](#missing-refs)
   * [Checking refs in tests](#checking-refs-in-tests)
 - [Typed Events](#typed-events)
@@ -56,11 +65,22 @@ Inspired by [nanotags](https://nanotags.psdcoder.dev/). Reactive props use
   * [`microtags/context`](#microtagscontext)
   * [`microtags/render`](#microtagsrender)
     + [`renderList`](#renderlist)
+      - [`renderList` Example](#renderlist-example)
     + [`render`](#render)
+      - [`render` Example](#render-example)
   * [`microtags/util`](#microtagsutil)
     + [Coercion](#coercion)
     + [`runAll`](#runall)
     + [`toAttributes`](#toattributes)
+  * [`microtags/htm`](#microtagshtm)
+    + [What escaping does not cover](#what-escaping-does-not-cover)
+  * [`microtags/render-support`](#microtagsrender-support)
+  * [`microtags/preact`](#microtagspreact)
+  * [`microtags/build`](#microtagsbuild)
+  * [`microtags/esbuild`](#microtagsesbuild)
+  * [`microtags/vite`](#microtagsvite)
+  * [`microbuild`](#microbuild)
+  * [`client:true` vs `--keep`](#clienttrue-vs---keep)
 - [Differences from `nanotags`](#differences-from-nanotags)
   * [Reactivity primitive](#reactivity-primitive)
   * [Effects + Subscriptions](#effects--subscriptions)
@@ -151,7 +171,8 @@ myCounter
 
 ### 3. Call `.setup`
 
-Method `.setup` takes a function that gets called with `context` object.
+Method `.setup` is the terminal step in the method chain. It takes a function
+that gets called with a `context` object. This is where "hydration" happens.
 
 ```ts
 myCounter
@@ -190,10 +211,10 @@ myCounter
 ## Full Example
 
 This example expects the full HTML to already be in the DOM.
-Defining the components is about "hydrating" the page, or adding behavior.
+Defining the components "hydrates" the page (adds behavior).
 
 If you want to client-side render the components, that is possible too.
-You can update the DOM inside `.setup`.
+You would update the DOM inside `.setup`.
 
 >
 > [!NOTE]  
@@ -371,7 +392,7 @@ define('subscribe-form')
         const value = signal('')
         const touched = signal<boolean>(false)
 
-        // capture the live value (two-way; clears the field on reset)
+        // capture the live value (clears the field on reset)
         ctx.bind(value, ctx.refs.input)
 
         // only reveal errors after the first blur
@@ -415,6 +436,9 @@ and the submit button is disabled until valid. See `example/subscribe-form.ts`.
 
 See [./example/ssr.ts](./example/ssr.ts) for an example of rendering an HTML
 string and then "hydrating" the page on the client.
+
+> [!NOTE]  
+> The server must know how to render the HTML that the components depend on.
 
 ### `.TAG`
 
@@ -461,6 +485,12 @@ export function render ():string {
 }
 ```
 
+> [!IMPORTANT]
+> Custom elements must always have a closing tag, even when empty, like
+> `<copy-btn></copy-btn>` above. HTML has no self-closing custom
+> elements. The browser parses `<copy-btn />` as an open tag and treats
+> everything after it as its children.
+
 ### `.refs`
 
 Web components created with `microtags` have a property `.refs`. It is an
@@ -481,6 +511,24 @@ export function render () {
 ```
 
 ---------------------------------------------------------------------
+
+## Hydration
+
+In the [preceding serverside example](#serverside-example), the
+server must know how to render the HTML that the client components depend on.
+That means we have an unspecified dependency between HTML and JS.
+Hydration is one way to render the correct HTML.
+
+You can write a `.render` method, and then use a build tool
+to strip the `.render` method from the JS sent to the client. That way
+the clientside bundle stays small, but on the server, every component can
+render itself, and the components shipped to the client deal with behavior only.
+
+See [`example-hydration/`](./example-hydration/) for a working example that
+uses Vite, and more docs.
+
+
+---------------------------------------------------------------
 
 
 ## API
@@ -504,6 +552,7 @@ The object returned by [`define`](#define). Includes methods:
 | `.withProps(fn)` | `ComponentBuilder` | Declare reactive attributes. See [Props](#props). |
 | `.withRefs(fn)` | `ComponentBuilder` | Declare DOM refs resolved once the element connects. See [Refs](#refs-1). |
 | `.withContexts(fn)` | `ComponentBuilder` | Consume context values published by an ancestor. See [`withContexts`](#withcontexts). |
+| `.render(fn, opts?)` | `ComponentBuilder` | Attach a server-render function. See [`.render`](#builderrenderfn-options) below. Not to be confused with the DOM helper [`microtags/render`](#microtagsrender). |
 | `.setup(fn)` | `MicrotagElementClass` | Registers the custom element and returns its class. See [`setup`](#setup) below. |
 
 Methods `withProps`, `withRefs`, and `withContexts` each return a new builder,
@@ -517,15 +566,18 @@ Declare reactive attributes via `withProps`. Each prop becomes:
 
 * An observed HTML attribute (auto-synced via `attributeChangedCallback`)
 * A signal at `ctx.props.propName`
-* A typed getter/setter on the element instance
-* Four built-in validators coerce raw attribute strings to typed values:
+* Four built-in coercers turn raw attribute strings into typed values:
 
-| Validator | Coercion | `null` attr |
-|-----------|----------|-------------|
-| `p.string()` | `String(val)` | `""` |
-| `p.number()` | `Number(val)` | `0` |
-| `p.boolean()` | `"true"` / `""` &rarr; `true`, `"false"` &rarr; `false` | `false` |
-| `p.oneOf(opts)` | Picklist enum, throws on invalid | throws |
+| Coercer | Attribute present | Attribute absent |
+|---------|-------------------|------------------|
+| `p.string()` | the raw string | `""` |
+| `p.number()` | `Number(val)`, so `NaN` if not numeric | `NaN` |
+| `p.boolean()` | `true`, whatever the value, including `""` and `"false"` | `false` |
+| `p.json<T>()` | `JSON.parse(val)`, or `undefined` if it does not parse | `undefined` |
+
+`p.boolean()` follows HTML boolean-attribute semantics: presence means
+`true`, like `disabled` or `checked`. To turn a boolean prop off, remove the
+attribute rather than setting it to `"false"`.
 
 ```ts
 .withProps(p => ({
@@ -715,6 +767,105 @@ define('themed-card')
 ---------------------------------------------------------
 
 
+### `builder.render(fn, options?)`
+
+Attach a render function that produces the component's inner HTML as a
+string. The render function receives a context with `props` (plain
+resolved values, not signals), `refs`, `TAG`, `children` (inner HTML
+from the caller), and `attrs` (extra attributes from the caller).
+
+```ts
+define('my-counter')
+    .withProps(p => ({
+        start: p.number(),
+    }))
+    .withRefs(r => ({
+        display: r.one<HTMLDivElement>(),
+        inc: r.one(),
+        dec: r.one(),
+    }))
+    .render(({ props, refs }) => {
+        return `
+            <div data-ref="${refs.display}">
+                ${props.start}
+            </div>
+            <button data-ref="${refs.dec}">-</button>
+            <button data-ref="${refs.inc}">+</button>
+        `
+    })
+    .setup(ctx => {
+        // hydration code only
+    })
+```
+
+The returned element class gains three statics: `render(props,
+options?)` which returns complete host markup, `renderParts(props,
+options?)` which returns the same render as parts, and `props`, the list
+of declared prop names. `options` accepts `children` (a string of inner
+HTML) and `attrs` (an object of extra attributes, all strings).
+
+`renderParts` returns `{ tag, attrs, html }`: the host tag name, the
+host attributes as serialized (not yet escaped) strings, and the inner
+HTML. `attrs` lists the declared props first, then the extra `attrs`,
+skipping prop-only props, null or false values, and extra names that are
+not valid attribute names. A true boolean is the empty string. Use it to
+build the host with another renderer, such as a UI framework, while
+`render` stays the string form:
+
+```ts
+import 'microtags/render-support'
+import type { RenderParts } from 'microtags'
+
+const { tag, attrs, html }:RenderParts = MyCounter.renderParts({
+    start: 5,
+})
+// tag: 'my-counter', attrs: { start: '5' }, html: '<div ...'
+```
+
+`props` are the names declared in `.withProps`. They are serialized onto
+the host tag with the prop's serializer, so `.setup` can coerce them back
+on the client. `attrs` are any other attributes the caller put on the
+tag, such as `class`, `id`, or `aria-*`. They are written to the host tag
+as-is, and are available to the render function so it can forward them
+inside. See [Hydration](#hydration) for an example.
+
+The static `render` (and `renderParts`) needs the server render
+support module, which builds the host tag and serializes props. The `microtags/htm`
+templater loads it, on the server and in the browser. Code that calls
+a component's `render` static directly, without the templater, must
+import [`microtags/render-support`](#microtagsrender-support) once.
+Without it, `render` and `renderParts` throw an error naming that
+module.
+
+```ts
+import 'microtags/render-support'
+import { MyCounter } from './components.js'
+
+const markup = MyCounter.render({ start: 5 })
+```
+
+> [!IMPORTANT]
+> This is a breaking change in 0.0.x. Before it, `render` worked with
+> no extra import.
+
+Pass `{ client: true }` to keep the render function in the client
+bundle after [`microbuild`](#microbuild) strips it:
+
+```ts
+.render(renderFn, { client: true })
+```
+
+See [`client:true` vs `--keep`](#clienttrue-vs---keep) for when to
+use each.
+
+> [!NOTE]
+> `.render` on the builder is unrelated to
+> [`microtags/render`](#microtagsrender), which is a DOM reconciler
+> for lists and single items.
+
+---------------------------------------------------------
+
+
 ### `builder.setup(ctx)`
 
 Registers the custom element via `customElements.define` and returns the
@@ -736,6 +887,14 @@ class ComponentBuilder {
 The callback function runs once per element instance, and is called with the
 following `context` object.
 
+Teardown waits a microtask. When the element is removed, its cleanups
+(listeners, effects, bindings, `onCleanup` callbacks) run on the next
+microtask, and only if it is still disconnected then. So an element that is
+removed and re-inserted in the same tick (a move) keeps its setup and
+state, even in browsers without `moveBefore`. After a real removal, cleanup has
+happened once `await Promise.resolve()` returns. If the element is inserted
+again later, setup runs again.
+
 
 #### `ctx`
 
@@ -750,11 +909,11 @@ ctx:SetupContext<Props, RefsMap<RefDefs>, ContextsMap<CtxDefs>>
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `.peek(signal)` | `T` | Read a signal's current value without subscribing, even inside `ctx.effect`. |
-| `.on(target, type, handler, options?)` | `void` | Add a DOM event listener, auto-removed on disconnect. |
+| `.on(target, type, handler, options?)` | `void` | Add a DOM event listener, auto-removed on teardown (a microtask after disconnect). |
 | `.emit(event)` / `.emit(name, detail?, options?)` | `boolean` | Dispatch a pre-built `Event` as-is, or construct and dispatch a bubbling `CustomEvent` from a name. Returns `dispatchEvent`'s result: `false` if a cancelable event had `preventDefault()` called. |
-| `.effect(fn)` | `void` | Run an alien-signals effect that auto-tracks the signals it reads. Auto-disposed on disconnect. |
-| `.bind(signal, element, options?)` | `void` | Bind a signal to a DOM element property, auto-cleaned on disconnect. |
-| `.onCleanup(fn)` | `void` | Register custom teardown to run on disconnect. |
+| `.effect(fn)` | `void` | Run an alien-signals effect that auto-tracks the signals it reads. Auto-disposed on teardown. |
+| `.bind(signal, element, options?)` | `void` | Bind a signal to a DOM element property, auto-cleaned on teardown. |
+| `.onCleanup(fn)` | `void` | Register custom teardown, run a microtask after disconnect. |
 | `.consume(token)` | `T \| undefined` | Read an optional context value published by an ancestor. See [`withContexts`](#withcontexts). |
 
 See [Typed Events](#typed-events) for more about `.on` and `.emit`.
@@ -795,6 +954,36 @@ ctx.bind(checked, ctx.refs.toggle)
 // one-way: push a derived value into a read-only display
 ctx.bind(() => `${count()} items`, ctx.refs.label, { prop: 'textContent' })
 ```
+
+---
+
+### `bindProp`
+
+Bind a signal (or computed) to a declared prop of another host, so the
+prop reads through to it. This is the same as assigning the signal to
+the host's prop accessor, but typed: the signal's value type must match
+the prop's type, and only declared props are accepted.
+
+```ts
+function bindProp (
+    host:HTMLElement,
+    name:string,  // a declared prop of `host`
+    source:() => T  // T is the prop's type
+):void
+```
+
+```ts
+import { define, bindProp } from 'microtags'
+import { computed } from 'alien-signals'
+
+// in a parent's setup, drive a nested host's `label` prop
+const label = computed(() => String(ctx.props.count()))
+bindProp(ctx.refs.badge, 'label', label)
+```
+
+While bound, the prop is read-only inside the nested component, and the
+host's HTML attribute is no longer updated. Assigning a plain value to
+the accessor removes the binding.
 
 ---
 
@@ -1216,6 +1405,351 @@ type Attrs = Record<
  */
 function toAttributes (attrs:Attrs):string
 ```
+
+### `microtags/htm`
+
+A tagged-template string renderer that will expand any microtags
+instances if finds. Exports `html`, `h`, `raw`, and the `Markup` type.
+`html`, `h`, and `raw` return `Markup`, not a string. Convert it with
+`String(m)` where a string is required, for example `innerHTML`. In the
+browser the same import resolves to a build that also exports `mount`;
+see [ADR-007](./docs/adr/ADR-007-client-templater.md).
+
+```ts
+import { html, raw } from 'microtags/htm'
+import { MyCounter } from './components.js'
+
+const page = html`<div>
+    <${MyCounter} start=${5}>
+        <p>Extra children</p>
+    </${MyCounter}>
+    ${raw('<b>trusted markup</b>')}
+</div>`
+```
+
+When `html` meets a microtags element class, it splits props from
+passthrough attributes using the class's static `props` list, joins
+children into one string, and calls the static `render`. Plain string
+tag names emit ordinary HTML.
+
+**Escaping.** Every interpolated string is escaped (`<`, `>`, `&`, `"`,
+`'`) before the parser sees it. Component output and `raw()` output
+are trusted and never re-escaped. Static template text is trusted.
+
+**Arrays.** Array children (from `.map()`) are flattened automatically.
+
+**Void elements.** Write void tags in the self-closing form, like
+`<br />`, `<img src="x" />`, and `<input value=${v} />`. The output has
+no closing tag and no trailing slash, eg `<br>`. The `htm` parser does
+not know which tags are void, so an unclosed `<br>` would be treated
+as an open tag and swallow the content after it. Instead of dropping
+that content, the templater throws, on the server and in the browser,
+and the error names the tag and its self-closing form.
+
+**Custom elements.** A component tag always gets a closing tag in the
+output, eg `<my-counter start="5">...</my-counter>`, because HTML has no
+self-closing custom elements. In a template, close a component with
+`</${MyComponent}>` or with the `htm` shorthand `<//>`, which closes
+the nearest open tag without repeating its name.
+
+#### What escaping does not cover
+
+Escaping keeps an interpolated string from becoming markup. It does not
+make every value safe in every place it can go.
+
+**URL schemes.** Attribute escaping keeps a value inside its quotes,
+but `href=${url}` with `url` set to `javascript:alert(1)` is still a
+working link. The same goes for `src`, `action`, `formaction`, and
+other attributes that take a URL. Check the scheme yourself (for
+example, allow only `http:`, `https:` and `mailto:`) before a URL from
+user data reaches the template.
+
+**`<script>` and `<style>`.** HTML escaping is the wrong encoding inside
+these elements. The browser does not decode entities there, so an
+escaped value comes out mangled, and HTML escaping does not stop a
+value from breaking out of a JavaScript string or a CSS rule. Do not
+interpolate user data into them. To pass data to a script, serialize it
+as JSON in a `<script type="application/json">` and escape `<` in the
+JSON, the way the hydration example's state script does.
+
+**`raw`.** `raw()` skips escaping by construction. Pass it only markup
+you wrote or trust, never user data.
+
+**Attribute names.** Escaping covers values, not names. A name must
+start with a letter, `_` or `:`, followed by letters, digits, `-`,
+`_`, `:` or `.`. Any other name, for example a key from a spread of
+user data such as `x" onload="...`, is skipped without an error, on the
+server, in the browser, and on a component's host tag. Valid keys in the
+same spread are still written.
+
+**Void elements.** A void element with children throws instead of
+rendering, on the server and in the browser. Write void tags in the
+self-closing form, `<input />`, so an unclosed tag cannot swallow the
+markup after it.
+
+---
+
+### `microtags/render-support`
+
+The host-tag builder, prop serializers and attribute escaping that a
+component's static `render` and `renderParts` use. Import it for its
+side effect:
+
+```ts
+import 'microtags/render-support'
+```
+
+It is separate from core so that a client bundle with every
+`.render` link stripped leaves this code out. The `microtags/htm`
+templater imports it already, and the [`microtags/build`](#microtagsbuild)
+transform adds it to any module where it keeps a `.render` link, so
+only code that calls a `render` or `renderParts` static without
+either needs this import. See
+[ADR-009](./docs/adr/ADR-009-server-render-support-through-render-link.md).
+
+---
+
+### `microtags/preact`
+
+Use a microtags component inside a Preact app, rendered on the server
+and hydrated in the browser, or rendered client-only. `toPreact(El,
+{ events })` takes an element class and returns a Preact component that
+renders the host tag. Preact owns the host and its attributes, and the
+element owns the host's children. See
+[ADR-010](./docs/adr/ADR-010-preact-adapter-ownership-split.md).
+
+```ts
+import { toPreact } from 'microtags/preact'
+import { NumberInput } from './number-input.js'
+
+// callback prop name -> DOM event name
+export const PreactNumberInput = toPreact(NumberInput, {
+    events: { onChange: 'number-input:change' },
+})
+```
+
+The component takes the element's declared props (typed from the
+class), one callback prop per entry in `events`, and `class`, `id`,
+`aria-*` and `data-*` props, which pass through to the host.
+
+**Server render, then hydrate.** On the server, the adapter fills the
+host with the component's own markup, so `renderToString` gives the
+same HTML as the component's `render` static. Server code must import
+a variant of the component that keeps its `.render` link; a class with
+no render link throws an error naming its tag.
+
+```ts
+// server
+import { h } from 'preact'
+import { renderToString } from 'preact-render-to-string'
+
+const body = renderToString(h(App, null))
+```
+
+```ts
+// browser
+import { h, hydrate } from 'preact'
+
+hydrate(h(App, null), document.getElementById('root')!)
+```
+
+In `App`, use the component like any other:
+
+```ts
+h(PreactNumberInput, {
+    min: 1,
+    class: 'qty',
+    onChange: (ev:CustomEvent) => setQty(ev.detail),
+})
+```
+
+In the browser, the host gets a `dangerouslySetInnerHTML` that never
+changes once the host is in the document. While hydrating, Preact
+leaves that element's children alone, so the element adopts the server
+markup. Later renders never write `innerHTML` either. Declared props
+reach the element as properties, including after `hydrate`, where
+Preact itself sets no props: the adapter assigns them once the host is
+committed, so a prop-only value or an object arrives too.
+
+**Client-only render.** With no server markup, call Preact's `render`.
+On that first render the adapter fills the host with the component's
+inner HTML from its `renderParts` static, before the element connects,
+so the element finds its markup and refs. This needs the variant of
+the component that keeps its render link, with
+[`microtags/render-support`](#microtagsrender-support) loaded (the
+build transform imports it for a kept render link). A component whose
+render link was stripped mounts as an empty host.
+
+```ts
+import { h, render } from 'preact'
+
+render(h(PreactNumberInput, { min: 1 }), document.body)
+```
+
+**Two builds.** The import resolves by export condition, the same way
+as [`microtags/htm`](#microtagshtm). The `browser` condition selects a
+build that contains no render code. The default build, for Node and
+SSR, imports [`microtags/render-support`](#microtagsrender-support).
+
+**Peer dependency.** `preact` is an optional peer dependency. Install
+it yourself. Only `microtags/preact` imports it.
+
+**No children.** The adapter does not accept Preact children. Passing
+them is a type error, and the adapter throws.
+
+**Props before definition.** If the element is not defined yet when
+Preact first sets a prop, the element has no property by that name, so
+Preact sets an attribute instead. The component reads its declared
+props from attributes when it connects, so a value that survives
+conversion to an attribute string still arrives. The adapter does not work around this.
+
+**Other host renderers.** The adapter is built on the
+[`renderParts`](#builderrenderfn-options) static, which returns the
+host tag, its serialized attributes and its inner HTML separately. An
+adapter for another framework can build on the same parts.
+
+---
+
+### `microtags/build`
+
+Node-only. Strips [`.render()`](#builderrenderfn-options) calls from
+define chains so the client bundle contains only hydration code.
+Requires `typescript` as a peer dependency.
+
+```ts
+import { transform } from 'microtags/build'
+
+const result = transform(source, {
+    keep: ['my-notice'],   // keep these tags' render in the bundle
+    cascade: true,         // dead-import removal, default false
+    filename: 'app.ts',    // shown in warnings
+})
+
+console.log(result.code)
+for (const w of result.warnings) {
+    console.warn(`${w.file}:${w.line} ${w.message}`)
+}
+```
+
+**Strip rule:** a `.render(...)` call is removed when it is a link in a
+call chain rooted at a `define(...)` call imported from `microtags`,
+with import aliases tracked. Nothing else named `render` is touched.
+
+**Keep rule (union):** the call is kept when its options argument is an
+object literal containing `client: true`, or when the string literal
+passed to `define` is listed in `keep`.
+
+**Output fidelity:** removed spans are replaced with the same number of
+newlines. Every other byte is unchanged, apart from the support import
+below. TS in, TS out.
+
+**Support import:** when a module keeps at least one `.render` link,
+the transform appends `import 'microtags/render-support'` after the
+last line, unless the module already imports it, so kept components
+can render in the browser. A module where every link was stripped gets
+no such import, and a bundle with no kept link and no templater import
+contains none of the server render code. A bundler config that aliases
+`microtags` to source should alias `microtags/render-support` too.
+
+**Unsupported:** `const b = define('x'); b.render(fn)` -- the
+non-chained form is not matched and is left unchanged.
+
+**`client: true` detection:** only an object literal is recognised. A
+variable or spread in the options position is not.
+
+**Type gap:** `MicrotagElementClass` declares `render` and `props` as
+always present. After stripping, `render` is `undefined` at runtime.
+
+**Warnings** (each with file and line):
+
+| Kind | Meaning |
+|------|---------|
+| `outside-chain` | `.render(` call not in a define chain |
+| `stripped-static` | `X.render(` after X's render was stripped |
+| `non-literal-tag` | `define(variable)` with `keep` set |
+
+---
+
+### `microtags/esbuild`
+
+Node-only esbuild plugin that calls [`transform`](#microtagsbuild) on
+every matching file during the build.
+
+```ts
+import { microtags } from 'microtags/esbuild'
+
+// in your esbuild config
+plugins: [
+    microtags({
+        cascade: true,
+        keep: ['my-notice'],
+    }),
+]
+```
+
+The plugin accepts the same options as `transform` plus a file `filter`.
+Warnings are forwarded to esbuild's warning channel.
+
+---
+
+### `microtags/vite`
+
+Node-only Vite plugin, same interface as the
+[esbuild plugin](#microtagsesbuild).
+
+```ts
+import { microtags } from 'microtags/vite'
+
+// in vite.config.ts
+plugins: [
+    microtags({
+        cascade: true,
+        keep: ['my-notice'],
+    }),
+]
+```
+
+---
+
+### `microbuild`
+
+CLI for stripping `.render()` calls outside a bundler.
+
+```sh
+# stdin/stdout -- one file
+cat src/counter.ts | microbuild --cascade > dist/counter.ts
+
+# glob mode -- requires --outdir
+microbuild 'src/**/*.ts' --outdir dist --cascade --keep my-notice
+```
+
+`--keep` is repeatable and accepts comma-separated tag names. `--root`
+sets the base for output paths (defaults to the current directory).
+Files are never rewritten in place.
+
+stdin mode transforms one file only. A multi-file app should use the
+[esbuild](#microtagsesbuild) or [vite](#microtagsvite) plugin, or
+glob mode.
+
+---
+
+### `client:true` vs `--keep`
+
+Both prevent [`microbuild`](#microbuild) from stripping a component's
+`.render()` call, but they work at different levels:
+
+- **`{ client: true }`** is set in source, in the `.render()` options.
+  Use it for components that must render themselves in the browser --
+  for example, a notice inserted dynamically after page load. The
+  decision travels with the component and applies in every build.
+
+- **`--keep tag-name`** (or the `keep` option in the plugin) is set at
+  build time. Use it to override stripping for specific tags without
+  changing source, for example during development or in a build
+  variant that needs client rendering.
+
+Both can be combined. A component is kept when either condition is met
+(union semantics).
 
 ---
 

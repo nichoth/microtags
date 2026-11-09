@@ -1,0 +1,135 @@
+hydra-badge {
+    --badge-border: #2f6fe5;
+    --badge-text: #17203a;
+
+    /*
+     * Everything is drawn in tile units on a 40-unit-tall pill and then
+     * scaled to the badge height, so changing --h resizes the whole
+     * stroke without distorting it.
+     */
+    --h: 3rem;
+    --e: calc(var(--h) * 11 / 40);
+    --p: calc(var(--h) * 11.04 / 40);
+    --c: calc(var(--h) * 22.76 / 40);
+
+    /* custom elements default to inline, which breaks the mask sizing */
+    display: inline-block;
+    position: relative;
+    box-sizing: border-box;
+    min-width: 6rem;
+    height: var(--h);
+    line-height: var(--h);
+    /* keep the label clear of the end caps */
+    padding: 0 var(--c);
+    color: var(--badge-text);
+    font-size: 2rem;
+    letter-spacing: 0.04em;
+    text-align: center;
+
+    /*
+     * The wavy stroke is a mask over a solid background, built from
+     * tiny SVG tiles: one period of a sine stroke for the top and
+     * bottom edges, and a full-height semicircular cap for each end.
+     * Tile boundaries sit on wave peaks, where the slope is zero, so
+     * the edge tiles can be rescaled by `round` to fit any badge width
+     * without a visible kink.
+     *
+     * The cap centreline is a semicircle carrying nine half-bumps of
+     * the wave, an odd count so the cap is symmetric top to bottom.
+     * That fixes the period at 11.04 units; the edge tiles are drawn
+     * at 12 and squeezed to match, which `round` does anyway. Geometry:
+     * centreline 4.18 in from the edge, cap radius 15.82, amplitude 2,
+     * 1.5 stroke. The stroke never touches the box edge, which keeps
+     * anti-aliasing specks out of the edge row when the badge lands on
+     * a fractional pixel.
+     */
+    --edge-top:
+        url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'\
+        viewBox='0 0 12 11'><path d='M0,6.18 c0.863,0,1.727,-0.667,3,-2\
+        c1.273,-1.333,2.137,-2,3,-2 c0.863,0,1.727,0.667,3,2\
+        c1.273,1.333,2.137,2,3,2' fill='none' stroke='black'\
+        stroke-width='1.5' stroke-linejoin='round'/></svg>");
+    --edge-bottom:
+        url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'\
+        viewBox='0 0 12 11'><path d='M0,4.82 c0.863,0,1.727,0.667,3,2\
+        c1.273,1.333,2.137,2,3,2 c0.863,0,1.727,-0.667,3,-2\
+        c1.273,-1.333,2.137,-2,3,-2' fill='none' stroke='black'\
+        stroke-width='1.5' stroke-linejoin='round'/></svg>");
+    --cap-left:
+        url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'\
+        viewBox='0 0 22.76 40'><path d='\
+        M22.76,33.82 C21.84,33.82 20.92,34.77 20,35.82 C19.54,36.34\
+        19.03,36.84 18.5,37.17 C17.97,37.49 17.42,37.64 16.91,37.55\
+        C16.4,37.46 15.93,37.13 15.54,36.65 C15.15,36.16 14.84,35.52\
+        14.59,34.87 C14.34,34.22 14.14,33.57 13.91,33.06 C13.69,32.54\
+        13.44,32.17 13.09,31.97 C12.74,31.77 12.29,31.74 11.74,31.8\
+        C11.18,31.86 10.52,32.01 9.83,32.12 C9.14,32.22 8.43,32.28\
+        7.81,32.19 C7.2,32.09 6.68,31.85 6.35,31.45 C6.02,31.06 5.87,30.51\
+        5.88,29.89 C5.9,29.26 6.08,28.57 6.3,27.91 C6.52,27.25 6.79,26.62\
+        6.94,26.09 C7.1,25.55 7.15,25.1 7.01,24.73 C6.88,24.35 6.55,24.04\
+        6.09,23.73 C5.62,23.42 5.02,23.11 4.42,22.75 C3.83,22.39 3.24,21.97\
+        2.83,21.5 C2.42,21.04 2.18,20.52 2.18,20 C2.18,19.48 2.42,18.97\
+        2.83,18.5 C3.24,18.03 3.83,17.61 4.42,17.25 C5.02,16.89 5.62,16.58\
+        6.09,16.27 C6.55,15.96 6.88,15.65 7.01,15.27 C7.15,14.9 7.1,14.45\
+        6.94,13.91 C6.79,13.38 6.52,12.75 6.3,12.09 C6.08,11.43 5.9,10.74\
+        5.88,10.12 C5.87,9.49 6.02,8.94 6.35,8.55 C6.68,8.15 7.2,7.91\
+        7.81,7.81 C8.43,7.72 9.14,7.78 9.83,7.88 C10.52,7.99 11.18,8.14\
+        11.74,8.2 C12.29,8.26 12.74,8.23 13.09,8.03 C13.44,7.83 13.69,7.46\
+        13.91,6.94 C14.14,6.43 14.34,5.78 14.59,5.13 C14.84,4.49 15.15,3.84\
+        15.54,3.35 C15.93,2.87 16.4,2.54 16.91,2.45 C17.42,2.36 17.97,2.51\
+        18.5,2.83 C19.03,3.16 19.54,3.66 20,4.18 C20.92,5.23 21.84,6.18\
+        22.76,6.18'\
+        fill='none' stroke='black' stroke-width='1.5'\
+        stroke-linejoin='round'/></svg>");
+    --cap-right:
+        url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'\
+        viewBox='0 0 22.76 40'><path d='\
+        M0,33.82 C0.92,33.82 1.84,34.77 2.76,35.82 C3.22,36.34 3.73,36.84\
+        4.26,37.17 C4.8,37.49 5.35,37.64 5.86,37.55 C6.37,37.46 6.83,37.13\
+        7.22,36.65 C7.61,36.16 7.92,35.52 8.17,34.87 C8.43,34.22 8.63,33.57\
+        8.85,33.06 C9.07,32.54 9.32,32.17 9.67,31.97 C10.02,31.77\
+        10.47,31.74 11.02,31.8 C11.58,31.86 12.24,32.01 12.93,32.12\
+        C13.62,32.22 14.33,32.28 14.95,32.19 C15.56,32.09 16.08,31.85\
+        16.41,31.45 C16.75,31.06 16.89,30.51 16.88,29.89 C16.86,29.26\
+        16.68,28.57 16.46,27.91 C16.24,27.25 15.98,26.62 15.82,26.09\
+        C15.66,25.55 15.61,25.1 15.75,24.73 C15.89,24.35 16.21,24.04\
+        16.68,23.73 C17.14,23.42 17.75,23.11 18.34,22.75 C18.94,22.39\
+        19.52,21.97 19.93,21.5 C20.34,21.04 20.58,20.52 20.58,20\
+        C20.58,19.48 20.34,18.97 19.93,18.5 C19.52,18.03 18.94,17.61\
+        18.34,17.25 C17.75,16.89 17.14,16.58 16.68,16.27 C16.21,15.96\
+        15.89,15.65 15.75,15.27 C15.61,14.9 15.66,14.45 15.82,13.91\
+        C15.98,13.38 16.24,12.75 16.46,12.09 C16.68,11.43 16.86,10.74\
+        16.88,10.12 C16.89,9.49 16.75,8.94 16.41,8.55 C16.08,8.15\
+        15.56,7.91 14.95,7.81 C14.33,7.72 13.62,7.78 12.93,7.88 C12.24,7.99\
+        11.58,8.14 11.02,8.2 C10.47,8.26 10.02,8.23 9.67,8.03 C9.32,7.83\
+        9.07,7.46 8.85,6.94 C8.63,6.43 8.43,5.78 8.17,5.13 C7.92,4.49\
+        7.61,3.84 7.22,3.35 C6.83,2.87 6.37,2.54 5.86,2.45 C5.35,2.36\
+        4.8,2.51 4.26,2.83 C3.73,3.16 3.22,3.66 2.76,4.18 C1.84,5.23\
+        0.92,6.18 0,6.18'\
+        fill='none' stroke='black' stroke-width='1.5'\
+        stroke-linejoin='round'/></svg>");
+
+    /*
+     * The stroke lives on a pseudo-element so the mask does not clip
+     * the label. The caps sit at either end of the border box. Tiling
+     * always fills the whole clip box, so the edges are laid along, and
+     * clipped to, a padding box that excludes the caps: a transparent
+     * border on the two ends.
+     */
+    &::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        border: solid transparent;
+        border-width: 0 var(--c);
+        background: var(--badge-border);
+        mask:
+            var(--cap-left) 0 0 / var(--c) 100% no-repeat,
+            var(--cap-right) 100% 0 / var(--c) 100% no-repeat,
+            var(--edge-top) 0 0 / var(--p) var(--e) round no-repeat
+                padding-box,
+            var(--edge-bottom) 0 100% / var(--p) var(--e) round no-repeat
+                padding-box;
+    }
+}

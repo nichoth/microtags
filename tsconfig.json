@@ -26,6 +26,7 @@
   },
   "include": [
     "example",
+    "example-hydration",
     "src/**/*",
     "test",
     "lib.es5.d.ts"
