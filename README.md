@@ -18,7 +18,7 @@ This package adds some provisions for serverside rendering.
 
 | Entry | Size (min + brotli) |
 |-------|---------------------|
-| `microtags` | <!-- size -->4.06 KB<!-- /size --> |
+| `microtags` | <!-- size -->3.99 KB<!-- /size --> |
 | `microtags/htm` | <!-- size:htm -->1.99 KB<!-- /size:htm --> |
 | `microtags/preact` | <!-- size:preact -->0.58 KB<!-- /size:preact --> |
 
