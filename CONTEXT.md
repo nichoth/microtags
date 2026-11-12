@@ -53,7 +53,8 @@ _Avoid_: validated prop, custom prop
 
 **Ref**:
 A child element the component declares with `withRefs` and resolves when
-the host connects. By default a ref is found by its `data-ref` attribute.
+the host connects, after an empty host with a kept render link is
+rendered. By default a ref is found by its `data-ref` attribute.
 _Avoid_: query, element ref, handle
 
 **Statics**:
@@ -69,8 +70,9 @@ children are light DOM, never a shadow root.
 _Avoid_: root, wrapper, container
 
 **Setup**:
-The function run once per host when it connects, after refs resolve and
-required provided contexts are available. Its cleanups run a microtask
+The function run once per host when it connects, after required provided
+contexts are available, an empty host with a kept render link is
+rendered, and refs resolve. Its cleanups run a microtask
 after the host disconnects, and only if it is still disconnected, so a
 host moved within one tick keeps its setup and state.
 _Avoid_: init, mount, constructor
@@ -154,7 +156,8 @@ _Avoid_: pre-render, static render
 
 **Client-rendered component**:
 A component whose render link is kept in the browser bundle so it can
-produce its own markup after page load.
+produce its own markup after page load. A page asks for the client
+render by inserting an empty host; core renders it before refs resolve.
 _Avoid_: dynamic component, lazy component
 
 **Templater**:

@@ -5,8 +5,11 @@ export default [
         path: 'dist/index.min.js',
         // measured 3.96 kB with server render support moved out of
         // core (ADR-009) and the typed bind helper; 3.99 kB with the
-        // renderParts static, rounded up to the next 0.05 kB
-        limit: '4 kB',
+        // renderParts static; 4.06 kB with an empty host rendered
+        // through a kept render link (ADR-011); 4.03 kB with comments
+        // counted as content, rounded up to the next
+        // 0.05 kB
+        limit: '4.1 kB',
     },
     {
         name: 'microtags/htm',

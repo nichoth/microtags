@@ -180,6 +180,17 @@ export function factory<Props extends FactoryProps = FactoryProps> (
                 for (const cancel of cancelCallbacks) cancel()
                 cancelCallbacks.length = 0
 
+                // An empty host with a kept render link is filled from
+                // its current props before refs resolve (ADR-011).
+                // Comments count as content: region markers from a
+                // templater or the server must survive.
+                const rp = (this.constructor as any).renderParts
+                if (rp && !this.innerHTML.trim()) {
+                    const v:any = {}
+                    for (const k in propDefs) v[k] = (this as any)[k]
+                    this.innerHTML = rp(v).html
+                }
+
                 const refs = collectRefs(this, refDefs)
                 const ctx = makeSetupContext(
                     this, props, refs, contexts, cleanups

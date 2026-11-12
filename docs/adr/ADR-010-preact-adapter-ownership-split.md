@@ -79,6 +79,11 @@ mechanism depends on two branches of Preact's element diff:
    (hydrated or mounted), `__html` never changes, so later renders
    never touch the children.
 
+> **Amended by [ADR-011][adr-011]:** core now renders an empty host
+> whose class keeps its render link, just before refs resolve. The
+> adapter is unchanged: it writes the inner HTML before the host
+> connects, so core sees a non-empty host and does not render again.
+
 Both branches were verified in Preact 10.29.7. The `preact` dev
 dependency is pinned, so a Preact change arrives as a deliberate bump,
 and the browser tests (hydrate keeps inner nodes, re-render keeps
@@ -148,3 +153,4 @@ No ADR is superseded.
 [adr-004]: ./ADR-004-client-bundle-size-outranks-ergonomics.md
 [adr-005]: ./ADR-005-single-file-components-with-build-time-render-stripping.md
 [adr-009]: ./ADR-009-server-render-support-through-render-link.md
+[adr-011]: ./ADR-011-core-renders-empty-host.md

@@ -3033,4 +3033,190 @@ test('parity table: server and browser emit the same HTML', t => {
     }
 })
 
+// Core renders an empty host with a kept render link (ADR-011)
+
+test('empty host: rendered before refs resolve and setup runs', t => {
+    let seen:Element|undefined
+    const El = define('test-empty-host-render')
+        .withRefs(r => ({ btn: r.one() }))
+        .render(() => bhtml`<button data-ref="btn">go</button>`)
+        .setup(ctx => { seen = ctx.refs.btn })
+    const host = document.createElement(El.TAG)
+    document.body.appendChild(host)
+    const btn = host.querySelector('button')
+    t.ok(btn, 'host has its rendered children')
+    t.ok(seen && seen === btn, 'setup ref is the rendered element')
+    host.remove()
+})
+
+test('empty host: in the document before define is rendered', t => {
+    const tag = 'test-empty-host-predef'
+    const box = document.createElement('div')
+    box.innerHTML = `<${tag}></${tag}>`
+    document.body.appendChild(box)
+    let seen:Element|undefined
+    define(tag)
+        .withRefs(r => ({ btn: r.one() }))
+        .render(() => bhtml`<button data-ref="btn">go</button>`)
+        .setup(ctx => { seen = ctx.refs.btn })
+    const btn = box.querySelector(tag + ' button')
+    t.ok(btn, 'upgraded host has its rendered children')
+    t.ok(seen && seen === btn, 'setup ref is the rendered element')
+    box.remove()
+})
+
+test('empty host: render uses attribute and pre-upgrade props', t => {
+    const tag = 'test-empty-host-props'
+    const pre = document.createElement(tag) as any
+    pre.lo = 3
+    pre.setAttribute('val', 'abc')
+    define(tag)
+        .withProps(p => ({ val: p.string(), lo: p.number() }))
+        .withRefs(r => ({ input: r.one() }))
+        .render(({ props }) => bhtml`<input data-ref="input"
+            value=${props.val} min=${props.lo} />`)
+        .setup(() => {})
+    document.body.appendChild(pre)
+    const input = pre.querySelector('input') as HTMLInputElement|null
+    t.equal(input?.value, 'abc', 'attribute reached the render')
+    t.equal(input?.min, '3', 'property set before upgrade reached it')
+    pre.remove()
+})
+
+test('empty host: whitespace-only host is rendered', t => {
+    const tag = 'test-empty-host-ws'
+    let seen:Element|undefined
+    define(tag)
+        .withRefs(r => ({ btn: r.one() }))
+        .render(() => bhtml`<button data-ref="btn">go</button>`)
+        .setup(ctx => { seen = ctx.refs.btn })
+    const box = document.createElement('div')
+    box.innerHTML = `<${tag}>\n   </${tag}>`
+    document.body.appendChild(box)
+    const btn = box.querySelector(tag + ' button')
+    t.ok(btn, 'whitespace host has its rendered children')
+    t.ok(seen && seen === btn, 'setup ref is the rendered element')
+    box.remove()
+})
+
+test('empty host: a host with server markup is not rendered over', t => {
+    const tag = 'test-empty-host-server'
+    let seen:Element|undefined
+    define(tag)
+        .withRefs(r => ({ btn: r.one() }))
+        .render(() => bhtml`<button data-ref="btn">client</button>`)
+        .setup(ctx => { seen = ctx.refs.btn })
+    const host = document.createElement(tag)
+    const btn = document.createElement('button')
+    btn.setAttribute('data-ref', 'btn')
+    host.appendChild(btn)
+    const box = document.createElement('div')
+    document.body.appendChild(box)
+    const mo = new MutationObserver(() => {})
+    mo.observe(box, { childList: true, subtree: true })
+    box.appendChild(host)
+    const records = mo.takeRecords()
+    mo.disconnect()
+    t.ok(
+        records.every(r => r.target === box),
+        'no child mutations inside the host'
+    )
+    t.ok(seen === btn, 'setup ref is the original server element')
+    t.ok(host.firstElementChild === btn, 'server element still in place')
+    box.remove()
+})
+
+test('empty host: no render link still throws missing refs', t => {
+    let ran = false
+    const El = define('test-empty-host-light')
+        .withRefs(r => ({ btn: r.one() }))
+        .setup(() => { ran = true })
+    const host = document.createElement(El.TAG)
+    let caught:Error|null = null
+    try {
+        (host as any).connectedCallback()
+    } catch (err) {
+        caught = err as Error
+    }
+    t.ok(caught !== null, 'connect throws for an empty host')
+    t.ok(!ran, 'setup did not run')
+    t.equal(host.childElementCount, 0, 'host stays empty')
+})
+
+test('empty host: reconnect after teardown does not render again', async t => {
+    let runs = 0
+    const El = define('test-empty-host-reconnect')
+        .withRefs(r => ({ btn: r.one() }))
+        .render(() => bhtml`<button data-ref="btn">go</button>`)
+        .setup(() => { runs++ })
+    const host = document.createElement(El.TAG)
+    document.body.appendChild(host)
+    const btn = host.querySelector('button')
+    host.remove()
+    await Promise.resolve()
+    document.body.appendChild(host)
+    t.equal(runs, 2, 'setup ran again on reconnect')
+    t.equal(host.children.length, 1, 'still one child element')
+    t.ok(btn && host.firstElementChild === btn, 'same rendered node kept')
+    host.remove()
+})
+
+test('empty host: waits for a provided context before rendering', t => {
+    const Ctx = createContext<string>()
+    let seen:Element|undefined
+    const El = define('test-empty-host-ctx')
+        .withRefs(r => ({ btn: r.one() }))
+        .withContexts(() => ({ c: Ctx }))
+        .render(() => bhtml`<button data-ref="btn">go</button>`)
+        .setup(ctx => { seen = ctx.refs.btn })
+    const wrapper = document.createElement('div')
+    const host = document.createElement(El.TAG)
+    wrapper.appendChild(host)
+    document.body.appendChild(wrapper)
+    t.equal(host.childNodes.length, 0, 'host stays empty while waiting')
+    t.ok(!seen, 'setup has not run')
+    provide(wrapper, Ctx, 'x')
+    const btn = host.querySelector('button')
+    t.ok(btn, 'host rendered once the context is provided')
+    t.ok(seen && seen === btn, 'setup ref is the rendered element')
+    wrapper.remove()
+})
+
+test('empty host: a templater host with an empty children region keeps it',
+    t => {
+        const items = signal<string[]>([])
+        define('test-empty-host-region')
+            .render(({ children }) => bhtml`${braw(children)}`)
+            .setup(() => {})
+        const root = document.createElement('div')
+        document.body.appendChild(root)
+        try {
+            mount(root, bhtml`<test-empty-host-region>${() =>
+                items().map(i => bhtml`<li key=${i}>${i}</li>`)
+            }</test-empty-host-region>`)
+            items(['a', 'b'])
+        } catch (err) {
+            t.fail(`threw: ${err}`)
+        }
+        const host = root.querySelector('test-empty-host-region')!
+        t.equal(host.querySelectorAll('li').length, 2,
+            'list renders after the region is filled')
+        root.remove()
+    })
+
+test('empty host: a server host holding only region markers is adopted',
+    t => {
+        const tag = 'test-empty-host-markers'
+        const box = document.createElement('div')
+        box.innerHTML = `<${tag}><!--[c--><!--[--><!--]--><!--]--></${tag}>`
+        document.body.appendChild(box)
+        define(tag)
+            .render(() => bhtml`<button>client</button>`)
+            .setup(() => {})
+        const host = box.querySelector(tag)!
+        t.equal(host.childElementCount, 0, 'no client markup written')
+        t.equal(host.childNodes.length, 4, 'region markers are kept')
+        box.remove()
+    })
+
 import './preact-browser.js'

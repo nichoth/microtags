@@ -16,9 +16,11 @@ consume these and `CONTEXT.md` for the project glossary.
 | [ADR-008][adr-008] | Serialized server state and unidirectional hydration | 2026-10-04 |
 | [ADR-009][adr-009] | Server render support loaded through the render link (amends ADR-005) | 2026-10-14 |
 | [ADR-010][adr-010] | Preact owns the host, the element owns its children | 2026-11-08 |
+| [ADR-011][adr-011] | Core renders an empty host with a kept render link (amends ADR-010) | 2026-11-10 |
 
 [adr-006]: ADR-006-hono-html-scaffold.md
 [adr-007]: ADR-007-client-templater.md
 [adr-008]: ADR-008-serialized-server-state.md
 [adr-009]: ADR-009-server-render-support-through-render-link.md
 [adr-010]: ADR-010-preact-adapter-ownership-split.md
+[adr-011]: ADR-011-core-renders-empty-host.md

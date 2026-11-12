@@ -18,7 +18,7 @@ This package adds some provisions for serverside rendering.
 
 | Entry | Size (min + brotli) |
 |-------|---------------------|
-| `microtags` | <!-- size -->3.99 KB<!-- /size --> |
+| `microtags` | <!-- size -->4.06 KB<!-- /size --> |
 | `microtags/htm` | <!-- size:htm -->1.99 KB<!-- /size:htm --> |
 | `microtags/preact` | <!-- size:preact -->0.58 KB<!-- /size:preact --> |
 
@@ -58,6 +58,7 @@ This package adds some provisions for serverside rendering.
       - [`ctx.bind`](#ctxbind)
   * [`bindProp`](#bindprop)
 - [Missing refs](#missing-refs)
+  * [Empty hosts](#empty-hosts)
   * [Checking refs in tests](#checking-refs-in-tests)
 - [Typed Events](#typed-events)
 - [Templates](#templates)
@@ -652,6 +653,14 @@ it instead. Queries are resolved relative to the host element, during
 All refs returned from this callback are typed as much as possible, and exposed
 on the `context` object passed to the `.setup` function.
 
+If the host is empty when it connects (no element children, no
+comments, and no text other than whitespace) and its class kept its
+[render link](#builderrenderfn-options), the host's inner HTML is
+rendered from its current props first, once, then refs are resolved
+and `.setup` runs. A client-rendered host looks the same to `.setup` as
+a server-rendered one. See [Missing refs](#missing-refs) for an empty host whose render
+link was stripped.
+
 
 ```ts
 class ComponentBuilder {
@@ -844,6 +853,13 @@ import { MyCounter } from './components.js'
 const markup = MyCounter.render({ start: 5 })
 ```
 
+In the browser, a class that kept its render link also renders an
+empty host itself: when the host connects with no element children,
+no comments and no text other than whitespace, core writes the `html` of
+`renderParts` (built from the host's current props) as its inner HTML,
+once, before refs resolve and `.setup` runs. See
+[Empty hosts](#empty-hosts).
+
 > [!IMPORTANT]
 > This is a breaking change in 0.0.x. Before it, `render` worked with
 > no extra import.
@@ -1004,6 +1020,28 @@ Call to `r.all()` are **never reported**. A missing match resolves to an
 empty array, not an error.
 
 This check happens right before the custom element runs your `.setup` function.
+
+### Empty hosts
+
+A page can ask for a client render by inserting an empty host, with
+`document.createElement`, `innerHTML`, or hand-written HTML such as
+`<my-counter start="5"></my-counter>`. "Empty" means no element
+children, no comments and no text other than whitespace. If the component's class
+kept its render link (`{ client: true }` or `--keep`, see
+[`client:true` vs `--keep`](#clienttrue-vs---keep)), the host's inner
+HTML is rendered from its current prop values (attributes, properties
+set before upgrade, and bound signals), then refs resolve and `.setup`
+runs. This happens once per host. A host with any element child or
+text is treated as server markup and is never rendered over.
+
+If the render link was stripped, nothing is rendered, and any `r.one`
+ref throws the missing-refs error above. A component without its
+render link expects server markup, so an empty host is a usage error.
+If the render link was kept but
+[`microtags/render-support`](#microtagsrender-support) is not loaded,
+the error names that module instead. See
+[ADR-011](./docs/adr/ADR-011-core-renders-empty-host.md) for the
+ordering and the size trade-off.
 
 For a component with no contexts, refs are resolved at the moment the element
 connects to the DOM. For a component that declares
@@ -1578,7 +1616,9 @@ so the element finds its markup and refs. This needs the variant of
 the component that keeps its render link, with
 [`microtags/render-support`](#microtagsrender-support) loaded (the
 build transform imports it for a kept render link). A component whose
-render link was stripped mounts as an empty host.
+render link was stripped mounts as an empty host, and core does not
+render it, so an `r.one` ref throws the
+[missing-refs error](#empty-hosts).
 
 ```ts
 import { h, render } from 'preact'

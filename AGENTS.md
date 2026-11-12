@@ -422,8 +422,8 @@ passthrough attrs as vnode props, `on<event-name>` per mapped event,
 and a per-instance (`useRef`) `dangerouslySetInnerHTML` whose
 `__html` getter calls `renderParts` only until the host's ref first
 fires. Preact never reads `__html` while hydrating, so it is read
-before commit only on a client-only mount; core does not render into
-an empty host on connect, so that is how the element gets its markup.
+before commit only on a client-only mount, so the host is already
+filled when it connects and core's empty-host render (ADR-011) skips it.
 Its `build-esm:min` entry relies on `--external:preact` (that flag
 applies to every min entry, and covers `preact/hooks`) and its size
 entry uses `ignore: ['preact']`. Because the root
@@ -492,6 +492,18 @@ in `test/types.ts` import it from `'microtags'` and need a rebuilt
 `dist/`. Do not confuse it with `ctx.bind` (DOM property binding).
 Small core exports minify shorter as `export const f = () => {}` than
 as `function f () {}`.
+
+### Empty-host render (`src/factory.ts`, ADR-011)
+
+`tryRunSetup` fills an empty host (whitespace-only `innerHTML`, so a
+host holding only region marker comments is not empty) from `this.constructor.renderParts` after the context check and
+before `collectRefs`. The statics are read at connect time because
+`setup` in the builder adds them after `factory` returns. Props are
+passed as a plain object built from the host's accessors; passing the
+host itself is 12 B smaller but hands the render fn an element. Tests
+for it live in `test/index.ts` (`empty host:`); a test that a host is
+not rendered over should also be checked against a mutant that always
+renders, since it passes on the pre-ADR-011 factory too.
 
 ### Host teardown (`src/factory.ts`)
 
